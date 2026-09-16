@@ -1963,6 +1963,7 @@
                 try {
                     const stats = await window.BhuviDB.syncLocalToSupabase(appData, inquiries);
                     if (stats.contentUploaded || stats.content || stats.success) {
+                        broadcastUpdate();
                         showToast(`✅ Successfully uploaded to Supabase! (${stats.inquiriesUploaded} bookings synced)`, "success");
                     } else {
                         showToast("⚠️ Could not write to site_content table. Ensure you ran supabase_schema.sql in Supabase SQL Editor.", "error");
@@ -1993,6 +1994,7 @@
                         renderAdminReviews();
                         renderInquiriesTable();
                         updateOverviewStats();
+                        broadcastUpdate();
                         showToast("✅ Loaded live catalog and inquiries from Supabase!", "success");
                     } else {
                         showToast("ℹ️ Supabase connected, but no catalog found in database. Click '⚡ 1-Click Upload Local Data to Supabase' first to upload your studio photos!", "info");

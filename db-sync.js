@@ -426,7 +426,15 @@
     }
 
     async function supabaseGetSiteContent() {
+        if (!isSupabaseReady || !supabaseClient) {
+            const cfg = getStoredSupabaseConfig();
+            if (cfg) initSupabase(cfg);
+        }
         if (!isSupabaseReady || !supabaseClient) return null;
+
+        let content = null;
+
+        // 1. Try reading from 'site_content' table (JSON document)
         try {
             const { data, error } = await supabaseClient
                 .from("site_content")
@@ -435,32 +443,106 @@
                 .maybeSingle();
 
             if (error) {
-                console.warn("Supabase site_content query error:", error.message);
+                console.warn("Supabase site_content query notice:", error.message);
                 window._lastSupabaseError = error.message;
-                throw new Error(error.message);
-            }
-
-            if (data && data.data) {
+            } else if (data && data.data) {
                 let contentData = data.data;
                 if (typeof contentData === "string") {
-                    try {
-                        contentData = JSON.parse(contentData);
-                    } catch (pe) {}
+                    try { contentData = JSON.parse(contentData); } catch (pe) {}
                 }
                 if (contentData && typeof contentData === "object") {
-                    return contentData;
+                    content = contentData;
                 }
             }
         } catch (e) {
-            console.warn("Supabase site_content query error:", e.message);
+            console.warn("Supabase site_content query notice:", e.message);
             window._lastSupabaseError = e.message;
-            throw e;
+        }
+
+        if (!content) {
+            content = {};
+        }
+
+        // 2. Fetch and merge from relational 'gallery' table
+        try {
+            const { data: galleryRows, error: gErr } = await supabaseClient
+                .from("gallery")
+                .select("*")
+                .order("display_order", { ascending: true });
+
+            if (!gErr && Array.isArray(galleryRows) && galleryRows.length > 0) {
+                content.gallery = galleryRows.map(r => ({
+                    id: r.id || ("gal-" + Math.random().toString(36).substr(2, 6)),
+                    title: r.title || "Mehndi Design",
+                    category: (r.category || "bridal").toLowerCase(),
+                    categoryLabel: r.category_label || (r.category ? r.category.toUpperCase() : "MEHNDI"),
+                    subtitle: r.subtitle || r.title || "Royal Henna",
+                    src: r.image_url || r.src || "",
+                    alt: r.alt_text || r.title || "Mehndi Design",
+                    isLarge: !!r.is_large
+                }));
+            }
+        } catch (ge) {}
+
+        // 3. Fetch and merge from relational 'hero_banners' table
+        try {
+            const { data: bannerRows, error: bErr } = await supabaseClient
+                .from("hero_banners")
+                .select("*")
+                .order("display_order", { ascending: true });
+
+            if (!bErr && Array.isArray(bannerRows) && bannerRows.length > 0) {
+                const activeBanners = bannerRows.filter(b => b.is_active !== false);
+                if (activeBanners.length > 0) {
+                    content.heroBanners = activeBanners.map(b => ({
+                        id: b.id || ("banner-" + Math.random().toString(36).substr(2, 6)),
+                        title: b.title || "Bhuvi Mehandi Luxury Henna Art",
+                        image: b.image_url || b.image || "hero-banner.png"
+                    }));
+                }
+            }
+        } catch (be) {}
+
+        // 4. Fetch and merge from relational 'reviews' table
+        try {
+            const { data: reviewRows, error: rErr } = await supabaseClient
+                .from("reviews")
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (!rErr && Array.isArray(reviewRows) && reviewRows.length > 0) {
+                content.reviews = reviewRows.map(r => ({
+                    id: r.id || ("rev-" + Math.random().toString(36).substr(2, 6)),
+                    name: r.name || "Happy Bride",
+                    role: r.role || "Bride • Udaipur",
+                    stars: parseInt(r.stars, 10) || 5,
+                    text: r.review_text || r.text || ""
+                }));
+            }
+        } catch (re) {}
+
+        // Return content if any catalog data is present
+        if (content && (
+            (Array.isArray(content.gallery) && content.gallery.length > 0) ||
+            (Array.isArray(content.heroBanners) && content.heroBanners.length > 0) ||
+            content.about ||
+            content.hero ||
+            content.settings
+        )) {
+            return content;
         }
         return null;
     }
 
     async function supabaseSaveSiteContent(content) {
-        if (!isSupabaseReady || !supabaseClient) return false;
+        if (!isSupabaseReady || !supabaseClient) {
+            const cfg = getStoredSupabaseConfig();
+            if (cfg) initSupabase(cfg);
+        }
+        if (!isSupabaseReady || !supabaseClient || !content) return false;
+        let success = false;
+
+        // 1. Upsert into site_content JSON document table
         try {
             const { error } = await supabaseClient
                 .from("site_content")
@@ -469,14 +551,64 @@
                     data: content,
                     updated_at: new Date().toISOString()
                 });
-            if (!error) return true;
-            console.warn("Supabase site_content save warning:", error.message);
-            window._lastSupabaseError = error.message;
+            if (!error) {
+                success = true;
+            } else {
+                console.warn("Supabase site_content save warning:", error.message);
+                window._lastSupabaseError = error.message;
+            }
         } catch (e) {
             console.warn("Supabase site_content save error:", e.message);
             window._lastSupabaseError = e.message;
         }
-        return false;
+
+        // 2. Also keep relational 'gallery' table in sync
+        if (Array.isArray(content.gallery) && content.gallery.length > 0) {
+            try {
+                const gRows = content.gallery.map((g, idx) => ({
+                    id: String(g.id || "gal-" + (idx + 1)),
+                    title: g.title || "Mehndi Design",
+                    category: (g.category || "bridal").toLowerCase(),
+                    category_label: g.categoryLabel || g.category || "Bridal",
+                    subtitle: g.subtitle || g.title || "Royal Henna",
+                    image_url: g.src || g.image_url || "",
+                    alt_text: g.alt || g.title || "Mehndi Design",
+                    is_large: !!g.isLarge,
+                    display_order: idx + 1
+                }));
+                await supabaseClient.from("gallery").upsert(gRows);
+            } catch (ge) {}
+        }
+
+        // 3. Also keep relational 'hero_banners' table in sync
+        if (Array.isArray(content.heroBanners) && content.heroBanners.length > 0) {
+            try {
+                const bRows = content.heroBanners.map((b, idx) => ({
+                    id: String(b.id || "banner-" + (idx + 1)),
+                    title: b.title || "Hero Banner " + (idx + 1),
+                    image_url: b.image || b.image_url || "hero-banner.png",
+                    display_order: idx + 1,
+                    is_active: true
+                }));
+                await supabaseClient.from("hero_banners").upsert(bRows);
+            } catch (be) {}
+        }
+
+        // 4. Also keep relational 'reviews' table in sync
+        if (Array.isArray(content.reviews) && content.reviews.length > 0) {
+            try {
+                const rRows = content.reviews.map((r, idx) => ({
+                    id: String(r.id || "rev-" + (idx + 1)),
+                    name: r.name || "Bride",
+                    role: r.role || "Bride • Udaipur",
+                    stars: parseInt(r.stars, 10) || 5,
+                    review_text: r.text || r.review_text || ""
+                }));
+                await supabaseClient.from("reviews").upsert(rRows);
+            } catch (re) {}
+        }
+
+        return success;
     }
 
     async function supabaseGetInquiries() {
@@ -637,14 +769,28 @@
             throw new Error("Supabase is not connected. Enter your Supabase Project URL and Anon Key, then click 'Save & Connect Supabase'.");
         }
         const content = await supabaseGetSiteContent();
-        if (content && typeof content === "object" && content.gallery && content.gallery.length > 0) {
-            localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
+        if (content && typeof content === "object") {
+            try {
+                localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
+                localStorage.setItem("bhuvi_last_sync", String(Date.now()));
+            } catch (e) {}
             await idbSet(LOCAL_DATA_KEY, content);
             if (isServerReady) serverSaveData(content);
+
+            // Broadcast to all open tabs so website re-renders instantly
+            try {
+                if (typeof BroadcastChannel !== "undefined") {
+                    const bc = new BroadcastChannel("bhuvi_studio_channel");
+                    bc.postMessage({ type: "DATA_UPDATED", timestamp: Date.now() });
+                    bc.close();
+                }
+            } catch (e) {}
         }
         const inqs = await supabaseGetInquiries();
         if (Array.isArray(inqs) && inqs.length > 0) {
-            localStorage.setItem(LOCAL_INQUIRIES_KEY, JSON.stringify(inqs));
+            try {
+                localStorage.setItem(LOCAL_INQUIRIES_KEY, JSON.stringify(inqs));
+            } catch (e) {}
             await idbSet(LOCAL_INQUIRIES_KEY, inqs);
             if (isServerReady) {
                 for (const inq of inqs) {
@@ -655,31 +801,30 @@
         return { content, inquiries: inqs };
     }
 
-    // Initialize Server, Supabase & Firebase
+    // Synchronously initialize Supabase immediately on script load
+    const initialSbConfig = getStoredSupabaseConfig();
+    if (initialSbConfig) {
+        initSupabase(initialSbConfig);
+    }
+
+    // Initialize Server & Firebase without blocking Supabase
     (async function initAllStorageEngines() {
-        await checkServerAvailability();
-
-        // 1. Initialize Supabase if credentials are present
-        const sbConfig = getStoredSupabaseConfig();
-        if (sbConfig) {
-            initSupabase(sbConfig);
-        }
-
-        // 2. Check if server has shared Firebase config for other devices
-        let config = getStoredFirebaseConfig();
-        if (!config && isServerReady) {
-            const serverConfig = await serverFetchConfig();
-            if (serverConfig && serverConfig.apiKey) {
-                config = serverConfig;
-                try {
-                    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-                } catch (e) {}
+        // Run server check asynchronously in background
+        checkServerAvailability().then(async () => {
+            let config = getStoredFirebaseConfig();
+            if (!config && isServerReady) {
+                const serverConfig = await serverFetchConfig();
+                if (serverConfig && serverConfig.apiKey) {
+                    config = serverConfig;
+                    try {
+                        localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+                    } catch (e) {}
+                }
             }
-        }
-
-        if (config) {
-            initFirebase(config);
-        }
+            if (config) {
+                initFirebase(config);
+            }
+        }).catch(() => {});
     })();
 
     /* -------------------------------------------------------------
@@ -694,14 +839,21 @@
     async function getSiteContent() {
         let content = null;
 
+        // Ensure Supabase is initialized before checking
+        if (!isSupabaseReady || !supabaseClient) {
+            const sbConfig = getStoredSupabaseConfig();
+            if (sbConfig) initSupabase(sbConfig);
+        }
+
         // 1. Check Supabase (Authoritative PostgreSQL Cloud Database)
         if (isSupabaseReady && supabaseClient) {
             try {
                 const sbData = await supabaseGetSiteContent();
-                if (sbData && typeof sbData === "object" && sbData.gallery && sbData.gallery.length > 0) {
+                if (sbData && typeof sbData === "object") {
                     content = sbData;
                     try {
                         localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
+                        localStorage.setItem("bhuvi_last_sync", String(Date.now()));
                     } catch (e) {}
                     await idbSet(LOCAL_DATA_KEY, content);
                     if (isServerReady) serverSaveData(content);
@@ -798,11 +950,15 @@
         createEmergencySnapshot(data);
 
         // 4. Save to Supabase Cloud Database (PostgreSQL)
+        if (!isSupabaseReady || !supabaseClient) {
+            const sbCfg = getStoredSupabaseConfig();
+            if (sbCfg) initSupabase(sbCfg);
+        }
         if (isSupabaseReady && supabaseClient) {
             try {
                 supabaseSuccess = await supabaseSaveSiteContent(data);
                 if (supabaseSuccess) {
-                    console.log("⚡ BhuviDB: Live site data saved to Supabase site_content table.");
+                    console.log("⚡ BhuviDB: Live site data saved to Supabase.");
                 }
             } catch (sbErr) {
                 console.warn("⚠️ Supabase save notice:", sbErr);
@@ -849,15 +1005,47 @@
 
     /**
      * Real-time Site Content Listener
-     * Combines Firebase Cloud Firestore real-time listener AND Server /api/last-updated polling (every 2s)
+     * Combines Supabase Realtime + Firebase Cloud Firestore real-time listener AND Server polling
      * This guarantees any phone or other device updates immediately when admin saves on laptop!
      */
     function listenToSiteContent(callback) {
         if (typeof callback !== "function") return null;
 
         let unsubCloud = null;
+        let supabaseChannel = null;
 
-        // 1. Cloud Firestore Real-time listener
+        // 1. Supabase Realtime Listener (PostgreSQL)
+        if (!isSupabaseReady || !supabaseClient) {
+            const sbCfg = getStoredSupabaseConfig();
+            if (sbCfg) initSupabase(sbCfg);
+        }
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                supabaseChannel = supabaseClient
+                    .channel("public:all_content_changes")
+                    .on(
+                        "postgres_changes",
+                        { event: "*", schema: "public" },
+                        async () => {
+                            console.log("⚡ Supabase Realtime: Live update received from Supabase!");
+                            const fresh = await supabaseGetSiteContent();
+                            if (fresh && typeof fresh === "object") {
+                                try {
+                                    localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(fresh));
+                                    localStorage.setItem("bhuvi_last_sync", String(Date.now()));
+                                } catch (e) {}
+                                await idbSet(LOCAL_DATA_KEY, fresh);
+                                callback(fresh);
+                            }
+                        }
+                    )
+                    .subscribe();
+            } catch (sbSubErr) {
+                console.warn("Supabase Realtime subscription notice:", sbSubErr);
+            }
+        }
+
+        // 2. Cloud Firestore Real-time listener
         if (isCloudReady && dbInstance) {
             try {
                 if (unsubscribeContent) unsubscribeContent();
@@ -873,7 +1061,7 @@
             } catch (e) {}
         }
 
-        // 2. Multi-Device Server Live Polling (every 2 seconds)
+        // 3. Multi-Device Server Live Polling (every 2 seconds)
         let lastTimestamp = 0;
         let isPolling = false;
 
@@ -908,6 +1096,9 @@
         }, 2000);
 
         return () => {
+            if (supabaseChannel && supabaseClient) {
+                try { supabaseClient.removeChannel(supabaseChannel); } catch (e) {}
+            }
             if (unsubCloud) unsubCloud();
             if (livePollTimer) clearInterval(livePollTimer);
         };
@@ -919,7 +1110,7 @@
 
     /**
      * Submit Booking Inquiry (Called from index.html booking form)
-     * Writes to: Server API + Cloud Firestore + Local IndexedDB + LocalStorage
+     * Writes to: Server API + Supabase + Cloud Firestore + Local IndexedDB + LocalStorage
      */
     async function submitInquiry(inquiryData) {
         const id = inquiryData.id || ("INQ-" + Date.now());
@@ -945,6 +1136,10 @@
 
         // 2. Save to Supabase (PostgreSQL Cloud Table)
         let supabaseSaved = false;
+        if (!isSupabaseReady || !supabaseClient) {
+            const sbCfg = getStoredSupabaseConfig();
+            if (sbCfg) initSupabase(sbCfg);
+        }
         if (isSupabaseReady && supabaseClient) {
             try {
                 supabaseSaved = await supabaseSaveInquiry(fullInquiry);

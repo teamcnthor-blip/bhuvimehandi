@@ -19,12 +19,12 @@ function initBhuviStudio() {
     function renderDynamicGallery(galleryList) {
         const galleryGrid = document.getElementById("galleryGrid");
         const filtersContainer = document.getElementById("galleryFilters");
-        if (!galleryGrid || !filtersContainer || !galleryList || !galleryList.length) return;
+        if (!galleryGrid || !filtersContainer || !Array.isArray(galleryList) || !galleryList.length) return;
 
         // Calculate counts
         const categoryCounts = { all: galleryList.length };
         galleryList.forEach(item => {
-            const cat = (item.category || "other").toLowerCase();
+            const cat = (item.category || "bridal").toLowerCase();
             categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
         });
 
@@ -49,21 +49,24 @@ function initBhuviStudio() {
         });
         filtersContainer.innerHTML = filtersHtml;
 
-        // Render gallery items
+        // Render gallery items - exactly matching style.css structure and lightbox handler
         galleryGrid.innerHTML = galleryList.map(item => {
-            const largeClass = item.isLarge ? " large" : "";
-            const catClass = (item.category || "all").toLowerCase();
-            const catBadge = item.categoryLabel || (item.category ? item.category.toUpperCase() : "MEHNDI");
-            const sub = item.subtitle || item.title || "Royal Henna";
+            const largeClass = (item.isLarge || item.is_large) ? " large" : "";
+            const catClass = (item.category || "bridal").toLowerCase();
+            const catBadge = item.categoryLabel || item.category_label || (item.category ? item.category.toUpperCase() : "MEHNDI");
+            const sub = item.subtitle || item.categoryLabel || item.title || "Royal Henna";
             const title = item.title || "Mehndi Design";
+            const imgSrc = item.src || item.image_url || item.image || "";
+            const altText = item.alt || item.alt_text || title;
+
             return `
                 <div class="gallery-item${largeClass}"
                      data-category="${catClass}"
                      data-title="${escapeHtml(title)}"
                      onclick="openLightbox(this)">
                     <img
-                        src="${escapeHtml(item.src)}"
-                        alt="${escapeHtml(item.alt || title)}"
+                        src="${escapeHtml(imgSrc)}"
+                        alt="${escapeHtml(altText)}"
                         loading="lazy"
                     >
                     <div class="gallery-overlay">
@@ -291,11 +294,15 @@ function initBhuviStudio() {
         // 1. Hero Brand Carousel
         let bannersToUse = [];
         if (Array.isArray(data.heroBanners) && data.heroBanners.length > 0) {
-            bannersToUse = [...data.heroBanners];
-        } else if (data.hero && data.hero.bannerImage) {
+            bannersToUse = data.heroBanners.map(b => ({
+                id: b.id,
+                title: b.title || "Bhuvi Mehandi Luxury Henna Art",
+                image: b.image || b.image_url || "hero-banner.png"
+            }));
+        } else if (data.hero && (data.hero.bannerImage || data.hero.image)) {
             bannersToUse = [{
                 id: "banner-1",
-                image: data.hero.bannerImage,
+                image: data.hero.bannerImage || data.hero.image,
                 title: "Bhuvi Mehandi - Professional Bridal Mehndi Artist Udaipur"
             }];
         }
@@ -313,10 +320,28 @@ function initBhuviStudio() {
 
         renderHeroCarousel(bannersToUse);
 
-        // 2. About Section
+        // 2. Hero / Intro text (if customized)
+        if (data.hero) {
+            const introEyebrow = document.querySelector(".section.intro .eyebrow");
+            if (introEyebrow && data.hero.eyebrow) {
+                introEyebrow.textContent = data.hero.eyebrow;
+            }
+            const introH2 = document.querySelector(".section.intro h2");
+            if (introH2 && (data.hero.headingPrefix || data.hero.headingHighlight)) {
+                introH2.innerHTML = `${escapeHtml(data.hero.headingPrefix || "")} <span class="highlight">${escapeHtml(data.hero.headingHighlight || "")}</span>`;
+            }
+            const introP = document.querySelector(".section.intro p");
+            if (introP && data.hero.description) {
+                introP.textContent = data.hero.description;
+            }
+        }
+
+        // 3. About Section
         if (data.about) {
             const aboutImg = document.getElementById("aboutImage");
-            if (aboutImg && data.about.image) aboutImg.src = data.about.image;
+            if (aboutImg && (data.about.image || data.about.image_url)) {
+                aboutImg.src = data.about.image || data.about.image_url;
+            }
 
             const aboutExpYears = document.getElementById("aboutExpYears");
             if (aboutExpYears && data.about.expYears) aboutExpYears.textContent = data.about.expYears;
@@ -334,7 +359,7 @@ function initBhuviStudio() {
             if (aboutBio2 && data.about.bio2) aboutBio2.textContent = data.about.bio2;
         }
 
-        // 3. Settings & Contact Info
+        // 4. Settings & Contact Info
         if (data.settings) {
             const s = data.settings;
             if (s.whatsapp) {
@@ -367,12 +392,12 @@ function initBhuviStudio() {
             }
         }
 
-        // 4. Custom Gallery
+        // 5. Custom Gallery
         if (Array.isArray(data.gallery) && data.gallery.length > 0) {
             renderDynamicGallery(data.gallery);
         }
 
-        // 5. Custom Reviews
+        // 6. Custom Reviews
         if (Array.isArray(data.reviews) && data.reviews.length > 0) {
             renderDynamicReviews(data.reviews);
         }
@@ -381,32 +406,33 @@ function initBhuviStudio() {
     async function loadCustomizedData() {
         let data = null;
 
-        // 1. Read from localStorage immediately (synchronous fast path)
+        // 1. Read from localStorage immediately (instant synchronous render)
         try {
             const raw = localStorage.getItem(DATA_KEY);
             if (raw) data = JSON.parse(raw);
         } catch (e) {}
 
-        if (data && data.gallery && data.gallery.length) {
+        if (data && typeof data === "object") {
             applyDataToWebsite(data);
         } else {
             renderHeroCarousel(defaultHeroBanners);
         }
 
-        // 2. Read from BhuviDB Unified Storage (Server API -> Cloud Firestore -> IndexedDB)
+        // 2. Read from BhuviDB Unified Storage (Supabase PostgreSQL -> Server API -> Cloud Firestore -> IndexedDB)
         if (window.BhuviDB && typeof window.BhuviDB.getSiteContent === "function") {
             try {
-                const cloudOrServerData = await window.BhuviDB.getSiteContent();
-                if (cloudOrServerData && typeof cloudOrServerData === "object" && cloudOrServerData.gallery && cloudOrServerData.gallery.length) {
-                    applyDataToWebsite(cloudOrServerData);
+                const liveData = await window.BhuviDB.getSiteContent();
+                if (liveData && typeof liveData === "object") {
+                    console.log("⚡ Bhuvi Studio: Hydrating live data from Supabase / Remote Storage.");
+                    applyDataToWebsite(liveData);
                 }
             } catch (err) {
-                console.warn("BhuviDB load notice:", err);
+                console.warn("BhuviDB live data notice:", err);
             }
         } else {
             // Fallback: Read from IndexedDB directly
             idbGet(DATA_KEY).then((idbData) => {
-                if (idbData && typeof idbData === "object" && idbData.gallery && idbData.gallery.length) {
+                if (idbData && typeof idbData === "object") {
                     applyDataToWebsite(idbData);
                 }
             });
@@ -439,7 +465,7 @@ function initBhuviStudio() {
     if (window.BhuviDB && typeof window.BhuviDB.listenToSiteContent === "function") {
         window.BhuviDB.listenToSiteContent((freshContent) => {
             if (freshContent && typeof freshContent === "object") {
-                console.log("⚡ Real-time website content update received from Server/Cloud.");
+                console.log("⚡ Real-time website content update received from Supabase / Cloud.");
                 try {
                     localStorage.setItem(DATA_KEY, JSON.stringify(freshContent));
                     localStorage.setItem("bhuvi_last_sync", String(Date.now()));
@@ -449,20 +475,26 @@ function initBhuviStudio() {
         });
     }
 
+    // Initial load right after listeners are attached
+    loadCustomizedData();
+
 function renderDynamicReviews(reviewsList) {
     const grid = document.getElementById("reviewsGrid");
-    if (!grid || !reviewsList || !reviewsList.length) return;
+    if (!grid || !Array.isArray(reviewsList) || !reviewsList.length) return;
 
     grid.innerHTML = reviewsList.map(r => {
         const starsCount = Math.max(1, Math.min(5, parseInt(r.stars, 10) || 5));
         const starsStr = "★".repeat(starsCount);
+        const text = r.text || r.review_text || "";
+        const name = r.name || "Happy Bride";
+        const role = r.role || "Bride • Udaipur";
         return `
             <div class="testimonial-card reveal show">
                 <div class="stars">${starsStr}</div>
-                <p>"${escapeHtml(r.text)}"</p>
+                <p>"${escapeHtml(text)}"</p>
                 <div class="review-author">
-                    <strong>${escapeHtml(r.name)}</strong>
-                    <span>${escapeHtml(r.role || "Bride • Udaipur")}</span>
+                    <strong>${escapeHtml(name)}</strong>
+                    <span>${escapeHtml(role)}</span>
                 </div>
             </div>
         `;
@@ -550,6 +582,9 @@ window.submitClientReview = function (event) {
 
         data.reviews.unshift(newReview);
         localStorage.setItem("bhuvi_mehndi_data", JSON.stringify(data));
+        if (window.BhuviDB && typeof window.BhuviDB.saveSiteContent === "function") {
+            window.BhuviDB.saveSiteContent(data);
+        }
         renderDynamicReviews(data.reviews);
 
         window.closeClientReviewModal();
