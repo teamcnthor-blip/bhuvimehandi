@@ -183,36 +183,6 @@
     /* ================= STATE ================= */
     let appData = null;
     let inquiries = [];
-    let dataLoaded = false; // Guard: blocks all saves/deletes until Supabase is fully loaded
-
-    function showAdminLoadingOverlay(message) {
-        let overlay = document.getElementById("adminLoadingOverlay");
-        if (!overlay) {
-            overlay = document.createElement("div");
-            overlay.id = "adminLoadingOverlay";
-            overlay.style.cssText = [
-                "position:fixed","top:0","left:0","width:100%","height:100%",
-                "background:rgba(0,0,0,0.65)","z-index:99999",
-                "display:flex","flex-direction:column","align-items:center","justify-content:center",
-                "color:#fff","font-family:inherit","gap:16px"
-            ].join(";");
-            overlay.innerHTML = `
-                <div style="width:52px;height:52px;border:4px solid rgba(255,255,255,0.3);border-top-color:#d4af37;border-radius:50%;animation:adminSpin 0.8s linear infinite"></div>
-                <div id="adminLoadingMsg" style="font-size:16px;font-weight:600;letter-spacing:0.5px;text-align:center;padding:0 24px">${message || "Loading data from database..."}</div>
-                <style>@keyframes adminSpin{to{transform:rotate(360deg)}}</style>
-            `;
-            document.body.appendChild(overlay);
-        } else {
-            const msg = overlay.querySelector("#adminLoadingMsg");
-            if (msg) msg.textContent = message || "Loading data from database...";
-            overlay.style.display = "flex";
-        }
-    }
-
-    function hideAdminLoadingOverlay() {
-        const overlay = document.getElementById("adminLoadingOverlay");
-        if (overlay) overlay.style.display = "none";
-    }
 
     function broadcastUpdate() {
         try {
@@ -228,49 +198,66 @@
         } catch (e) {}
     }
 
-    // Load state safely: Supabase (authoritative) -> Server API -> Cloud Firestore -> IndexedDB -> LocalStorage
-    // Shows a loading overlay on ALL devices until the authoritative data is ready.
+    // Load state safely: Server API -> Cloud Firestore -> IndexedDB -> LocalStorage
+    // NEVER prematurely overwrites existing data with DEFAULT_DATA on startup!
     async function loadState() {
-        dataLoaded = false;
-        showAdminLoadingOverlay("⚡ Connecting to database...");
+        let loaded = null;
 
-        // 1. Authoritative Load via BhuviDB (Supabase is top priority)
+        // 1. Fast initial synchronous read from localStorage for instant render
+        try {
+            const raw = localStorage.getItem(DATA_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === "object") {
+                    loaded = parsed;
+                }
+            }
+        } catch (e) {}
+
+        if (loaded) {
+            appData = loaded;
+            renderAdminBanners();
+            renderAdminGallery();
+            renderAdminReviews();
+            updateOverviewStats();
+        }
+
+        // 2. Authoritative Multi-Device Load via BhuviDB (Supabase / Server / Cloud)
         if (window.BhuviDB && typeof window.BhuviDB.getSiteContent === "function") {
             try {
-                showAdminLoadingOverlay("⚡ Loading data from Supabase...");
                 const authoritativeData = await window.BhuviDB.getSiteContent();
                 if (authoritativeData && typeof authoritativeData === "object") {
                     appData = authoritativeData;
-                    console.log("⚡ Admin: Loaded authoritative data from Supabase/BhuviDB.");
+                    renderAdminBanners();
+                    renderAdminGallery();
+                    renderAdminReviews();
+                    initAboutSection();
+                    initSettingsSection();
+                    updateOverviewStats();
                 }
             } catch (err) {
                 console.warn("BhuviDB load error:", err);
             }
         }
 
-        // 2. Fallback to IndexedDB
+        // 3. Fallback to IndexedDB if appData is still missing
         if (!appData) {
-            showAdminLoadingOverlay("Loading from local cache...");
             const idbData = await idbGet(DATA_KEY);
             if (idbData && typeof idbData === "object") {
                 appData = idbData;
+                renderAdminBanners();
+                renderAdminGallery();
+                renderAdminReviews();
+                initAboutSection();
+                initSettingsSection();
+                updateOverviewStats();
             }
         }
 
-        // 3. Fallback to localStorage
+        // 4. ONLY if appData is STILL null after ALL sources checked, initialize with in-memory DEFAULT_DATA
+        // CRITICAL FIX: NEVER call saveSiteContent here! That was overwriting database content!
         if (!appData) {
-            try {
-                const raw = localStorage.getItem(DATA_KEY);
-                if (raw) {
-                    const parsed = JSON.parse(raw);
-                    if (parsed && typeof parsed === "object") appData = parsed;
-                }
-            } catch (e) {}
-        }
-
-        // 4. Last resort: in-memory defaults (never saved to cloud)
-        if (!appData) {
-            console.info("ℹ️ No existing data found. Initializing in-memory defaults.");
+            console.info("ℹ️ No existing data found in server/cloud/local DB. Initializing in-memory default catalog.");
             appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
         }
 
@@ -280,18 +267,6 @@
         if (!Array.isArray(appData.reviews)) appData.reviews = [];
         if (!appData.about) appData.about = {};
         if (!appData.settings) appData.settings = {};
-
-        // ✅ Mark data as fully loaded — now safe to delete/edit/save
-        dataLoaded = true;
-        hideAdminLoadingOverlay();
-
-        // Render all UI panels
-        renderAdminBanners();
-        renderAdminGallery();
-        renderAdminReviews();
-        initAboutSection();
-        initSettingsSection();
-        updateOverviewStats();
 
         // 5. Inquiries Loading
         if (window.BhuviDB && typeof window.BhuviDB.getInquiries === "function") {
@@ -310,10 +285,14 @@
             }
         }
 
+        // Render UI with full data
+        renderAdminBanners();
+        renderAdminGallery();
+        renderAdminReviews();
         renderInquiriesTable();
         updateOverviewStats();
 
-        // 6. Listen for Real-Time Client Inquiries
+        // 6. Listen for Real-Time Client Inquiries from live website or other devices
         if (window.BhuviDB && typeof window.BhuviDB.listenToInquiries === "function") {
             window.BhuviDB.listenToInquiries((liveInqs) => {
                 if (Array.isArray(liveInqs)) {
@@ -709,10 +688,6 @@
         };
 
         window.adminDeleteBanner = function (id) {
-            if (!dataLoaded) {
-                showToast("⏳ Please wait — data is still loading from database.", "info");
-                return;
-            }
             const list = appData.heroBanners || [];
             const item = list.find(b => b.id === id);
             const title = item ? item.title : "this banner";
@@ -947,10 +922,6 @@
         };
 
         window.adminDeleteGallery = function (id) {
-            if (!dataLoaded) {
-                showToast("⏳ Please wait — data is still loading from database.", "info");
-                return;
-            }
             const item = (appData.gallery || []).find(g => g.id === id);
             const title = item ? item.title : "this item";
             if (confirm(`Are you sure you want to remove "${title}" from the gallery?`)) {
@@ -984,10 +955,6 @@
 
         if (saveBtn) {
             saveBtn.addEventListener("click", () => {
-                if (!dataLoaded) {
-                    showToast("⏳ Please wait — data is still loading from database.", "info");
-                    return;
-                }
                 const src = (galImageInput.value || "").trim();
                 const title = (galTitleInput.value || "").trim();
                 const category = galCategorySelect.value;
@@ -998,7 +965,6 @@
                     alert("Please provide an image URL or upload an image file.");
                     return;
                 }
-
                 if (!title) {
                     alert("Please provide a title for this design.");
                     return;
@@ -1191,10 +1157,6 @@
         };
 
         window.adminDeleteReview = function (id) {
-            if (!dataLoaded) {
-                showToast("⏳ Please wait — data is still loading from database.", "info");
-                return;
-            }
             const item = (appData.reviews || []).find(r => r.id === id);
             const name = item ? item.name : "this review";
             if (confirm(`Are you sure you want to delete review from "${name}"?`)) {
@@ -1209,10 +1171,6 @@
 
         if (saveBtn) {
             saveBtn.addEventListener("click", () => {
-                if (!dataLoaded) {
-                    showToast("⏳ Please wait — data is still loading from database.", "info");
-                    return;
-                }
                 const name = (revNameInput.value || "").trim();
                 const role = (revRoleInput.value || "").trim();
                 const stars = parseInt(revStarsSelect.value, 10) || 5;
@@ -1228,7 +1186,6 @@
                 }
 
                 if (!appData.reviews) appData.reviews = [];
-
 
                 if (editingReviewId) {
                     const idx = appData.reviews.findIndex(r => r.id === editingReviewId);
