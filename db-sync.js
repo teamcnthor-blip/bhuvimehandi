@@ -18,10 +18,13 @@
     const LOCAL_DATA_KEY = "bhuvi_mehndi_data";
     const LOCAL_INQUIRIES_KEY = "bhuvi_inquiries";
     const CONFIG_KEY = "bhuvi_firebase_config";
+    const SUPABASE_CONFIG_KEY = "bhuvi_supabase_config";
     const BACKUP_HISTORY_KEY = "bhuvi_backup_history";
 
     let dbInstance = null; // Firestore reference
     let isCloudReady = false;
+    let supabaseClient = null; // Supabase client instance
+    let isSupabaseReady = false;
     let isServerReady = false;
     let serverBaseUrl = "";
     let unsubscribeInquiries = null;
@@ -367,11 +370,268 @@
         }
     }
 
-    // Initialize Server & Cloud
+    /* -------------------------------------------------------------
+       3B. SUPABASE CLOUD (POSTGRESQL) INITIALIZATION & METHODS
+       ------------------------------------------------------------- */
+    function getStoredSupabaseConfig() {
+        try {
+            const raw = localStorage.getItem(SUPABASE_CONFIG_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.url && parsed.anonKey) return parsed;
+            }
+        } catch (e) {}
+
+        if (window.BHUVI_SUPABASE_CONFIG && window.BHUVI_SUPABASE_CONFIG.url && window.BHUVI_SUPABASE_CONFIG.anonKey) {
+            return window.BHUVI_SUPABASE_CONFIG;
+        }
+        return null;
+    }
+
+    function saveSupabaseConfig(config) {
+        if (!config || !config.url || !config.anonKey) {
+            localStorage.removeItem(SUPABASE_CONFIG_KEY);
+            supabaseClient = null;
+            isSupabaseReady = false;
+            return;
+        }
+        localStorage.setItem(SUPABASE_CONFIG_KEY, JSON.stringify(config));
+        initSupabase(config);
+    }
+
+    function initSupabase(config) {
+        if (!config || !config.url || !config.anonKey) {
+            isSupabaseReady = false;
+            supabaseClient = null;
+            return false;
+        }
+
+        if (typeof window.supabase === "undefined" || typeof window.supabase.createClient !== "function") {
+            console.warn("⚠️ BhuviDB: Supabase SDK library not loaded on page.");
+            isSupabaseReady = false;
+            return false;
+        }
+
+        try {
+            supabaseClient = window.supabase.createClient(config.url, config.anonKey);
+            isSupabaseReady = true;
+            console.log("⚡ BhuviDB: Supabase Cloud Database Connected successfully (" + config.url + ")");
+            return true;
+        } catch (err) {
+            console.error("❌ BhuviDB: Supabase initialization error:", err);
+            isSupabaseReady = false;
+            supabaseClient = null;
+            return false;
+        }
+    }
+
+    async function supabaseGetSiteContent() {
+        if (!isSupabaseReady || !supabaseClient) return null;
+        try {
+            const { data, error } = await supabaseClient
+                .from("site_content")
+                .select("data")
+                .eq("id", "live")
+                .maybeSingle();
+
+            if (!error && data && data.data && typeof data.data === "object") {
+                return data.data;
+            }
+        } catch (e) {
+            console.warn("Supabase site_content query error:", e.message);
+        }
+        return null;
+    }
+
+    async function supabaseSaveSiteContent(content) {
+        if (!isSupabaseReady || !supabaseClient) return false;
+        try {
+            const { error } = await supabaseClient
+                .from("site_content")
+                .upsert({
+                    id: "live",
+                    data: content,
+                    updated_at: new Date().toISOString()
+                });
+            if (!error) return true;
+            console.warn("Supabase site_content save warning:", error.message);
+        } catch (e) {
+            console.warn("Supabase site_content save error:", e.message);
+        }
+        return false;
+    }
+
+    async function supabaseGetInquiries() {
+        if (!isSupabaseReady || !supabaseClient) return null;
+        try {
+            const { data, error } = await supabaseClient
+                .from("inquiries")
+                .select("*")
+                .order("created_at", { ascending: false });
+
+            if (!error && Array.isArray(data)) {
+                return data.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    phone: item.phone,
+                    occasion: item.occasion,
+                    eventType: item.occasion,
+                    eventDate: item.event_date,
+                    eventDateFormatted: item.event_date,
+                    timeSlot: item.time_slot,
+                    city: item.city,
+                    venue: item.city,
+                    guests: item.guests,
+                    guestCount: item.guests,
+                    packageId: item.package_id,
+                    budget: item.budget,
+                    notes: item.notes,
+                    status: item.status || "New",
+                    submittedAt: item.created_at,
+                    formattedDateSubmitted: item.created_at ? new Date(item.created_at).toLocaleDateString() : ""
+                }));
+            }
+        } catch (e) {
+            console.warn("Supabase inquiries query error:", e.message);
+        }
+        return null;
+    }
+
+    async function supabaseSaveInquiry(inq) {
+        if (!isSupabaseReady || !supabaseClient) return false;
+        try {
+            const row = {
+                id: inq.id || ("INQ-" + Date.now()),
+                name: inq.name || "Unknown",
+                phone: inq.phone || "",
+                occasion: inq.occasion || inq.eventType || "",
+                event_date: inq.eventDate || inq.eventDateFormatted || "",
+                time_slot: inq.timeSlot || "",
+                city: inq.city || inq.venue || "",
+                guests: inq.guests || inq.guestCount || "",
+                package_id: inq.packageId || "",
+                budget: inq.budget || "",
+                notes: inq.notes || "",
+                status: inq.status || "New",
+                created_at: inq.submittedAt || inq.createdAt || new Date().toISOString()
+            };
+            const { error } = await supabaseClient
+                .from("inquiries")
+                .upsert(row);
+            return !error;
+        } catch (e) {
+            console.warn("Supabase save inquiry error:", e.message);
+        }
+        return false;
+    }
+
+    async function supabaseUpdateInquiryStatus(id, status) {
+        if (!isSupabaseReady || !supabaseClient) return false;
+        try {
+            const { error } = await supabaseClient
+                .from("inquiries")
+                .update({
+                    status: status,
+                    status_updated_at: new Date().toISOString()
+                })
+                .eq("id", id);
+            return !error;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function supabaseDeleteInquiry(id) {
+        if (!isSupabaseReady || !supabaseClient) return false;
+        try {
+            const { error } = await supabaseClient
+                .from("inquiries")
+                .delete()
+                .eq("id", id);
+            return !error;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function testSupabaseConnection(config) {
+        if (!config || !config.url || !config.anonKey) {
+            return { success: false, message: "Missing Supabase URL or Anon Key." };
+        }
+        if (typeof window.supabase === "undefined" || typeof window.supabase.createClient !== "function") {
+            return { success: false, message: "Supabase SDK library not loaded on page." };
+        }
+        try {
+            const client = window.supabase.createClient(config.url, config.anonKey);
+            const { data, error } = await client.from("site_content").select("id").limit(1);
+            if (error) {
+                if (error.code === "PGRST204" || error.code === "42P01") {
+                    return {
+                        success: false,
+                        message: "Connected to Supabase project, but tables are missing! Please run the SQL schema script in Supabase SQL Editor."
+                    };
+                }
+                return { success: false, message: "Supabase notice: " + error.message };
+            }
+            return { success: true, message: "Connection successful! Supabase tables are online and connected." };
+        } catch (err) {
+            return { success: false, message: err.message || "Failed to reach Supabase project." };
+        }
+    }
+
+    async function syncLocalToSupabase(localAppData, localInquiries) {
+        if (!isSupabaseReady || !supabaseClient) {
+            throw new Error("Supabase is not connected. Please enter your Supabase Project URL and Anon Key.");
+        }
+        let contentOk = false;
+        let inquiriesCount = 0;
+
+        if (localAppData) {
+            contentOk = await supabaseSaveSiteContent(localAppData);
+        }
+        if (Array.isArray(localInquiries) && localInquiries.length > 0) {
+            for (const inq of localInquiries) {
+                const ok = await supabaseSaveInquiry(inq);
+                if (ok) inquiriesCount++;
+            }
+        }
+        return { content: contentOk, inquiriesUploaded: inquiriesCount };
+    }
+
+    async function pullSupabaseToLocal() {
+        if (!isSupabaseReady || !supabaseClient) {
+            throw new Error("Supabase is not connected.");
+        }
+        const content = await supabaseGetSiteContent();
+        if (content && typeof content === "object" && content.gallery && content.gallery.length > 0) {
+            localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
+            await idbSet(LOCAL_DATA_KEY, content);
+            if (isServerReady) serverSaveData(content);
+        }
+        const inqs = await supabaseGetInquiries();
+        if (Array.isArray(inqs) && inqs.length > 0) {
+            localStorage.setItem(LOCAL_INQUIRIES_KEY, JSON.stringify(inqs));
+            await idbSet(LOCAL_INQUIRIES_KEY, inqs);
+            if (isServerReady) {
+                for (const inq of inqs) {
+                    await serverSaveInquiry(inq);
+                }
+            }
+        }
+        return { content, inquiries: inqs };
+    }
+
+    // Initialize Server, Supabase & Firebase
     (async function initAllStorageEngines() {
         await checkServerAvailability();
 
-        // Check if server has shared Firebase config for other devices
+        // 1. Initialize Supabase if credentials are present
+        const sbConfig = getStoredSupabaseConfig();
+        if (sbConfig) {
+            initSupabase(sbConfig);
+        }
+
+        // 2. Check if server has shared Firebase config for other devices
         let config = getStoredFirebaseConfig();
         if (!config && isServerReady) {
             const serverConfig = await serverFetchConfig();
@@ -394,13 +654,32 @@
 
     /**
      * Load Site Content
-     * Priority: Server API (/api/data) -> Cloud Firestore -> Local IndexedDB -> LocalStorage
+     * Priority: Supabase (PostgreSQL) -> Server API (/api/data) -> Cloud Firestore -> Local IndexedDB -> LocalStorage
      * Authoritative remote/server data is always mirrored to local storage.
      */
     async function getSiteContent() {
         let content = null;
 
-        // 1. Check Server API (Authoritative for all connected devices on network/VPS)
+        // 1. Check Supabase (Authoritative PostgreSQL Cloud Database)
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                const sbData = await supabaseGetSiteContent();
+                if (sbData && typeof sbData === "object" && sbData.gallery && sbData.gallery.length > 0) {
+                    content = sbData;
+                    try {
+                        localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
+                    } catch (e) {}
+                    await idbSet(LOCAL_DATA_KEY, content);
+                    if (isServerReady) serverSaveData(content);
+                    console.log("⚡ BhuviDB: Loaded live site content from Supabase.");
+                    return content;
+                }
+            } catch (err) {
+                console.warn("⚠️ BhuviDB: Supabase content fetch notice:", err);
+            }
+        }
+
+        // 2. Check Server API (Authoritative for all connected devices on network/VPS)
         try {
             const sData = await serverFetchData();
             if (sData && typeof sData === "object" && sData.gallery && sData.gallery.length > 0) {
@@ -413,7 +692,7 @@
             }
         } catch (e) {}
 
-        // 2. Check Cloud Firestore if connected
+        // 3. Check Cloud Firestore if connected
         if (isCloudReady && dbInstance) {
             try {
                 const docRef = dbInstance.collection("site_content").doc("live");
@@ -435,14 +714,14 @@
             }
         }
 
-        // 3. Check Local IndexedDB (High-capacity disk storage)
+        // 4. Check Local IndexedDB (High-capacity disk storage)
         const idbData = await idbGet(LOCAL_DATA_KEY);
         if (idbData && typeof idbData === "object" && idbData.gallery && idbData.gallery.length > 0) {
             serverSaveData(idbData);
             return idbData;
         }
 
-        // 4. Check LocalStorage (Fast-path memory fallback)
+        // 5. Check LocalStorage (Fast-path memory fallback)
         try {
             const raw = localStorage.getItem(LOCAL_DATA_KEY);
             if (raw) {
@@ -460,7 +739,7 @@
 
     /**
      * Save Site Content (Photos, text, rates, settings)
-     * Writes to: IndexedDB (disk) + LocalStorage + Server API (/api/data) + Cloud Firestore
+     * Writes to: IndexedDB (disk) + LocalStorage + Supabase + Server API (/api/data) + Cloud Firestore
      */
     async function saveSiteContent(data) {
         if (!data || typeof data !== "object") return false;
@@ -468,6 +747,7 @@
         let localSuccess = false;
         let serverSuccess = false;
         let cloudSuccess = false;
+        let supabaseSuccess = false;
 
         // 1. Always save to IndexedDB first (Virtually unlimited quota for large photos)
         localSuccess = await idbSet(LOCAL_DATA_KEY, data);
@@ -483,7 +763,19 @@
         // 3. Create Emergency Snapshot in local history
         createEmergencySnapshot(data);
 
-        // 4. Save to Server API (Permanent server disk file data_store.json)
+        // 4. Save to Supabase Cloud Database (PostgreSQL)
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                supabaseSuccess = await supabaseSaveSiteContent(data);
+                if (supabaseSuccess) {
+                    console.log("⚡ BhuviDB: Live site data saved to Supabase site_content table.");
+                }
+            } catch (sbErr) {
+                console.warn("⚠️ Supabase save notice:", sbErr);
+            }
+        }
+
+        // 5. Save to Server API (Permanent server disk file data_store.json)
         try {
             serverSuccess = await serverSaveData(data);
             if (serverSuccess) {
@@ -493,7 +785,7 @@
             console.warn("Server save notice:", e);
         }
 
-        // 5. Save to Cloud Firestore
+        // 6. Save to Cloud Firestore
         if (isCloudReady && dbInstance) {
             try {
                 const payload = {
@@ -509,7 +801,7 @@
             }
         }
 
-        // 6. Broadcast to open tabs
+        // 7. Broadcast to open tabs
         try {
             if (typeof BroadcastChannel !== "undefined") {
                 const bc = new BroadcastChannel("bhuvi_studio_channel");
@@ -518,7 +810,7 @@
             }
         } catch (e) {}
 
-        return { local: localSuccess, server: serverSuccess, cloud: cloudSuccess };
+        return { local: localSuccess, server: serverSuccess, cloud: cloudSuccess, supabase: supabaseSuccess };
     }
 
     /**
@@ -617,7 +909,20 @@
             await idbSet(LOCAL_INQUIRIES_KEY, currentList);
         } catch (e) {}
 
-        // 2. Save directly to Server API (/api/inquiries)
+        // 2. Save to Supabase (PostgreSQL Cloud Table)
+        let supabaseSaved = false;
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                supabaseSaved = await supabaseSaveInquiry(fullInquiry);
+                if (supabaseSaved) {
+                    console.log("⚡ BhuviDB: Booking inquiry inserted into Supabase inquiries table: " + id);
+                }
+            } catch (sbErr) {
+                console.warn("⚠️ Supabase inquiry save notice:", sbErr);
+            }
+        }
+
+        // 3. Save directly to Server API (/api/inquiries)
         let serverSaved = false;
         try {
             serverSaved = await serverSaveInquiry(fullInquiry);
@@ -626,7 +931,7 @@
             }
         } catch (e) {}
 
-        // 3. Save directly to Cloud Firestore
+        // 4. Save directly to Cloud Firestore
         let cloudSaved = false;
         if (isCloudReady && dbInstance) {
             try {
@@ -644,7 +949,7 @@
             queueInquiryForSync(fullInquiry);
         }
 
-        // 4. Broadcast to open admin tabs
+        // 5. Broadcast to open admin tabs
         try {
             if (typeof BroadcastChannel !== "undefined") {
                 const bc = new BroadcastChannel("bhuvi_studio_channel");
@@ -653,15 +958,31 @@
             }
         } catch (e) {}
 
-        return { success: true, server: serverSaved, cloud: cloudSaved, id: id };
+        return { success: true, server: serverSaved, cloud: cloudSaved, supabase: supabaseSaved, id: id };
     }
 
     /**
      * Get All Inquiries
-     * Priority: Cloud Firestore -> Server API -> Local IndexedDB -> LocalStorage
+     * Priority: Supabase (PostgreSQL) -> Cloud Firestore -> Server API -> Local IndexedDB -> LocalStorage
      */
     async function getInquiries() {
-        // 1. If Cloud is connected, fetch from Firestore
+        // 1. If Supabase is connected, fetch from Supabase inquiries table
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                const sbList = await supabaseGetInquiries();
+                if (Array.isArray(sbList) && sbList.length > 0) {
+                    try {
+                        localStorage.setItem(LOCAL_INQUIRIES_KEY, JSON.stringify(sbList));
+                    } catch (e) {}
+                    await idbSet(LOCAL_INQUIRIES_KEY, sbList);
+                    return sbList;
+                }
+            } catch (err) {
+                console.warn("⚠️ BhuviDB: Supabase inquiries fetch notice:", err);
+            }
+        }
+
+        // 2. If Cloud Firestore is connected, fetch from Firestore
         if (isCloudReady && dbInstance) {
             try {
                 const snapshot = await dbInstance.collection("inquiries").orderBy("submittedAt", "desc").limit(200).get();
@@ -682,7 +1003,7 @@
             }
         }
 
-        // 2. Check Server API (/api/inquiries)
+        // 3. Check Server API (/api/inquiries)
         if (isServerReady) {
             const serverInqs = await serverFetchInquiries();
             if (Array.isArray(serverInqs) && serverInqs.length > 0) {
@@ -694,7 +1015,7 @@
             }
         }
 
-        // 3. Local Caches
+        // 4. Local Caches
         let localList = [];
         try {
             const raw = localStorage.getItem(LOCAL_INQUIRIES_KEY);
@@ -771,6 +1092,15 @@
             }
         } catch (e) {}
 
+        // Supabase update
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                await supabaseUpdateInquiryStatus(id, newStatus);
+            } catch (sbErr) {
+                console.warn("Supabase status update notice:", sbErr);
+            }
+        }
+
         // Server update
         if (isServerReady) {
             serverUpdateInquiryStatus(id, newStatus);
@@ -801,6 +1131,15 @@
             localStorage.setItem(LOCAL_INQUIRIES_KEY, JSON.stringify(filtered));
             await idbSet(LOCAL_INQUIRIES_KEY, filtered);
         } catch (e) {}
+
+        // Supabase delete
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                await supabaseDeleteInquiry(id);
+            } catch (sbErr) {
+                console.warn("Supabase delete notice:", sbErr);
+            }
+        }
 
         if (isServerReady) {
             serverDeleteInquiry(id);
@@ -977,6 +1316,17 @@
        8. PUBLIC EXPOSURE VIA GLOBAL NAMESPACE
        ------------------------------------------------------------- */
     window.BhuviDB = {
+        // Supabase Cloud Exports
+        initSupabase: initSupabase,
+        isSupabaseReady: () => isSupabaseReady,
+        getSupabaseConfig: getStoredSupabaseConfig,
+        saveSupabaseConfig: saveSupabaseConfig,
+        testSupabaseConnection: testSupabaseConnection,
+        syncLocalToSupabase: syncLocalToSupabase,
+        pullSupabaseToLocal: pullSupabaseToLocal,
+        getSupabaseClient: () => supabaseClient,
+
+        // Firebase Cloud Exports
         init: initFirebase,
         isCloudReady: () => isCloudReady,
         isServerReady: () => isServerReady,

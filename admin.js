@@ -320,12 +320,14 @@
         // 4. Real-time broadcast to open website tabs
         broadcastUpdate();
 
-        if (saveResult && saveResult.server) {
+        if (saveResult && saveResult.supabase) {
+            showToast("⚡ Changes saved to Supabase PostgreSQL & synced live!", "success");
+        } else if (saveResult && saveResult.server) {
             showToast("✅ Changes saved to Disk (data_store.json) & synced to phone live!", "success");
         } else if (saveResult && saveResult.cloud) {
             showToast("☁️ Changes saved to Cloud Firestore & synced worldwide!", "success");
         } else {
-            showToast("💾 Saved locally. Start server ('node server.js') to sync to other devices.", "info");
+            showToast("💾 Saved locally. Start server or connect Supabase for live sync.", "info");
         }
         updateOverviewStats();
     }
@@ -1282,6 +1284,9 @@
                 inq.status = newStatus;
                 saveInquiries();
                 renderInquiriesTable();
+                if (window.BhuviDB && typeof window.BhuviDB.updateInquiryStatus === "function") {
+                    window.BhuviDB.updateInquiryStatus(id, newStatus);
+                }
                 showToast(`Inquiry status updated to ${newStatus}`, "info");
             }
         };
@@ -1291,6 +1296,9 @@
                 inquiries = inquiries.filter(i => i.id !== id);
                 saveInquiries();
                 renderInquiriesTable();
+                if (window.BhuviDB && typeof window.BhuviDB.deleteInquiry === "function") {
+                    window.BhuviDB.deleteInquiry(id);
+                }
                 showToast("Inquiry deleted", "info");
             }
         };
@@ -1460,6 +1468,17 @@
         const cloudAlertBox = document.getElementById("cloudAlertBox");
         const statusCloudTier = document.getElementById("statusCloudTier");
 
+        // Supabase elements
+        const sbUrlInput = document.getElementById("sbUrlInput");
+        const sbKeyInput = document.getElementById("sbKeyInput");
+        const supabaseStatusPill = document.getElementById("supabaseStatusPill");
+        const btnTestSupabase = document.getElementById("btnTestSupabase");
+        const btnSaveSupabaseConfig = document.getElementById("btnSaveSupabaseConfig");
+        const btnClearSupabaseConfig = document.getElementById("btnClearSupabaseConfig");
+        const btnSyncToSupabase = document.getElementById("btnSyncToSupabase");
+        const btnPullFromSupabase = document.getElementById("btnPullFromSupabase");
+
+        // Firebase elements
         const fbApiKeyInput = document.getElementById("fbApiKeyInput");
         const fbProjectIdInput = document.getElementById("fbProjectIdInput");
         const fbAuthDomainInput = document.getElementById("fbAuthDomainInput");
@@ -1475,26 +1494,36 @@
         const btnFlushOfflineQueue = document.getElementById("btnFlushOfflineQueue");
 
         function updateCloudUI() {
+            // Check Supabase Tier
+            const isSbReady = window.BhuviDB && typeof window.BhuviDB.isSupabaseReady === "function" && window.BhuviDB.isSupabaseReady();
+            const sbConfig = window.BhuviDB && typeof window.BhuviDB.getSupabaseConfig === "function" ? window.BhuviDB.getSupabaseConfig() : null;
+
+            if (sbConfig) {
+                if (sbUrlInput && !sbUrlInput.value) sbUrlInput.value = sbConfig.url || "";
+                if (sbKeyInput && !sbKeyInput.value) sbKeyInput.value = sbConfig.anonKey || "";
+            }
+
+            if (supabaseStatusPill) {
+                if (isSbReady && sbConfig && sbConfig.url) {
+                    let displayUrl = sbConfig.url.replace(/^https?:\/\//, "");
+                    if (displayUrl.length > 30) displayUrl = displayUrl.slice(0, 27) + "...";
+                    supabaseStatusPill.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #3ecf8e; display: inline-block;"></span> ⚡ Supabase Connected (${escapeHtml(displayUrl)})`;
+                    supabaseStatusPill.style.background = "rgba(62, 207, 142, 0.15)";
+                    supabaseStatusPill.style.color = "#3ecf8e";
+                    supabaseStatusPill.style.borderColor = "rgba(62, 207, 142, 0.35)";
+                } else {
+                    supabaseStatusPill.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #eab308; display: inline-block;"></span> Local Storage Mode (Enter Supabase Keys)`;
+                    supabaseStatusPill.style.background = "rgba(234, 179, 8, 0.15)";
+                    supabaseStatusPill.style.color = "#eab308";
+                    supabaseStatusPill.style.borderColor = "rgba(234, 179, 8, 0.3)";
+                }
+            }
+
+            // Check Firebase Tier
             const isReady = window.BhuviDB && window.BhuviDB.isCloudReady();
             const config = window.BhuviDB ? window.BhuviDB.getConfig() : null;
 
             if (isReady && config) {
-                if (badgeCloudStatus) {
-                    badgeCloudStatus.textContent = "🟢 Online";
-                    badgeCloudStatus.style.background = "rgba(34, 197, 94, 0.18)";
-                    badgeCloudStatus.style.color = "#22c55e";
-                }
-                if (statCloudStatus) {
-                    statCloudStatus.textContent = "Cloud Live";
-                    statCloudStatus.style.color = "#22c55e";
-                }
-                if (statCloudSub) {
-                    statCloudSub.textContent = config.projectId || "Multi-Device Synced";
-                }
-                if (statCloudIconWrapper) {
-                    statCloudIconWrapper.style.background = "rgba(34, 197, 94, 0.15)";
-                    statCloudIconWrapper.style.color = "#22c55e";
-                }
                 if (cloudStatusPill) {
                     cloudStatusPill.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block;"></span> Cloud Connected (${escapeHtml(config.projectId)})`;
                     cloudStatusPill.style.background = "rgba(34, 197, 94, 0.15)";
@@ -1516,22 +1545,6 @@
                     cloudAlertDesc.textContent = "All gallery updates, prices, and settings are permanently stored in Google Firebase. Any inquiry submitted by a bride on the live website will instantly reach this admin dashboard in real-time.";
                 }
             } else {
-                if (badgeCloudStatus) {
-                    badgeCloudStatus.textContent = "Local";
-                    badgeCloudStatus.style.background = "rgba(234, 179, 8, 0.18)";
-                    badgeCloudStatus.style.color = "#eab308";
-                }
-                if (statCloudStatus) {
-                    statCloudStatus.textContent = "Local Mode";
-                    statCloudStatus.style.color = "#eab308";
-                }
-                if (statCloudSub) {
-                    statCloudSub.textContent = "Click to Connect Cloud";
-                }
-                if (statCloudIconWrapper) {
-                    statCloudIconWrapper.style.background = "rgba(234, 179, 8, 0.15)";
-                    statCloudIconWrapper.style.color = "#eab308";
-                }
                 if (cloudStatusPill) {
                     cloudStatusPill.innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #eab308; display: inline-block;"></span> Local Storage Mode (Offline)`;
                     cloudStatusPill.style.background = "rgba(234, 179, 8, 0.15)";
@@ -1551,6 +1564,60 @@
                 }
                 if (cloudAlertDesc) {
                     cloudAlertDesc.textContent = "Your photos, settings, and inquiries are currently saved in your computer's browser storage. To make inquiries and updates accessible across multiple phones and computers once published on the web (e.g. GitHub Pages, Netlify, or Vercel), enter your free Firebase credentials below.";
+                }
+            }
+
+            // Top Dashboard Badges & Counters: Supabase takes top priority!
+            if (isSbReady && sbConfig && sbConfig.url) {
+                if (badgeCloudStatus) {
+                    badgeCloudStatus.textContent = "⚡ Supabase Live";
+                    badgeCloudStatus.style.background = "rgba(62, 207, 142, 0.18)";
+                    badgeCloudStatus.style.color = "#3ecf8e";
+                }
+                if (statCloudStatus) {
+                    statCloudStatus.textContent = "Supabase Live";
+                    statCloudStatus.style.color = "#3ecf8e";
+                }
+                if (statCloudSub) {
+                    statCloudSub.textContent = "PostgreSQL Cloud Active";
+                }
+                if (statCloudIconWrapper) {
+                    statCloudIconWrapper.style.background = "rgba(62, 207, 142, 0.15)";
+                    statCloudIconWrapper.style.color = "#3ecf8e";
+                }
+            } else if (isReady && config) {
+                if (badgeCloudStatus) {
+                    badgeCloudStatus.textContent = "🟢 Firebase Live";
+                    badgeCloudStatus.style.background = "rgba(34, 197, 94, 0.18)";
+                    badgeCloudStatus.style.color = "#22c55e";
+                }
+                if (statCloudStatus) {
+                    statCloudStatus.textContent = "Firebase Live";
+                    statCloudStatus.style.color = "#22c55e";
+                }
+                if (statCloudSub) {
+                    statCloudSub.textContent = config.projectId || "Multi-Device Synced";
+                }
+                if (statCloudIconWrapper) {
+                    statCloudIconWrapper.style.background = "rgba(34, 197, 94, 0.15)";
+                    statCloudIconWrapper.style.color = "#22c55e";
+                }
+            } else {
+                if (badgeCloudStatus) {
+                    badgeCloudStatus.textContent = "Local";
+                    badgeCloudStatus.style.background = "rgba(234, 179, 8, 0.18)";
+                    badgeCloudStatus.style.color = "#eab308";
+                }
+                if (statCloudStatus) {
+                    statCloudStatus.textContent = "Local Mode";
+                    statCloudStatus.style.color = "#eab308";
+                }
+                if (statCloudSub) {
+                    statCloudSub.textContent = "Click to Connect Supabase";
+                }
+                if (statCloudIconWrapper) {
+                    statCloudIconWrapper.style.background = "rgba(234, 179, 8, 0.15)";
+                    statCloudIconWrapper.style.color = "#eab308";
                 }
             }
 
@@ -1797,6 +1864,137 @@
                     showToast("Checking and flushing offline queue...", "info");
                     await window.BhuviDB.flushOfflineQueue();
                     showToast("Offline queue check complete.", "success");
+                }
+            });
+        }
+
+        // ================= SUPABASE ACTIONS =================
+        // 7. Test Supabase Connection
+        if (btnTestSupabase) {
+            btnTestSupabase.addEventListener("click", async () => {
+                const url = (sbUrlInput ? sbUrlInput.value : "").trim();
+                const anonKey = (sbKeyInput ? sbKeyInput.value : "").trim();
+
+                if (!url || !anonKey) {
+                    showToast("Please enter both Supabase Project URL and Anon API Key to test.", "error");
+                    return;
+                }
+
+                showToast("Testing Supabase connection...", "info");
+                if (window.BhuviDB && typeof window.BhuviDB.testSupabaseConnection === "function") {
+                    const res = await window.BhuviDB.testSupabaseConnection({ url, anonKey });
+                    if (res.success) {
+                        showToast("⚡ " + res.message, "success");
+                    } else {
+                        showToast("❌ Supabase test notice: " + res.message, "error");
+                    }
+                }
+            });
+        }
+
+        // 8. Save Supabase Config and Connect
+        if (btnSaveSupabaseConfig) {
+            btnSaveSupabaseConfig.addEventListener("click", async () => {
+                const url = (sbUrlInput ? sbUrlInput.value : "").trim();
+                const anonKey = (sbKeyInput ? sbKeyInput.value : "").trim();
+
+                if (!url || !anonKey) {
+                    showToast("Please enter both Supabase Project URL and Anon Key.", "error");
+                    return;
+                }
+
+                showToast("Connecting to Supabase...", "info");
+                if (window.BhuviDB && typeof window.BhuviDB.saveSupabaseConfig === "function") {
+                    window.BhuviDB.saveSupabaseConfig({ url, anonKey });
+                    const ok = window.BhuviDB.initSupabase({ url, anonKey });
+                    updateCloudUI();
+
+                    if (ok) {
+                        showToast("🎉 Supabase Connected! Testing tables...", "success");
+
+                        // Offer to upload local data into Supabase
+                        if (confirm("Supabase credentials saved! Would you like to upload your existing local gallery photos, banners, and inquiries to your Supabase tables right now?")) {
+                            try {
+                                showToast("Uploading catalog to Supabase...", "info");
+                                const res = await window.BhuviDB.syncLocalToSupabase(appData, inquiries);
+                                if (res.contentUploaded) {
+                                    showToast(`⚡ Studio catalog & ${res.inquiriesUploaded} inquiries uploaded to Supabase successfully!`, "success");
+                                } else {
+                                    showToast("Saved config. Ensure you ran the SQL tables script in Supabase SQL Editor.", "info");
+                                }
+                            } catch (syncErr) {
+                                showToast("Upload notice: " + syncErr.message + " (Check if SQL table exists)", "error");
+                            }
+                        }
+                    } else {
+                        showToast("Could not initialize Supabase. Check URL format and Anon key.", "error");
+                    }
+                }
+            });
+        }
+
+        // 9. Disconnect / Clear Supabase Config
+        if (btnClearSupabaseConfig) {
+            btnClearSupabaseConfig.addEventListener("click", () => {
+                if (confirm("Disconnect Supabase and revert to local storage? (Your data will stay safe locally)")) {
+                    if (window.BhuviDB && typeof window.BhuviDB.saveSupabaseConfig === "function") {
+                        window.BhuviDB.saveSupabaseConfig(null);
+                    }
+                    if (sbUrlInput) sbUrlInput.value = "";
+                    if (sbKeyInput) sbKeyInput.value = "";
+                    updateCloudUI();
+                    showToast("Supabase disconnected. Operating in local mode.", "info");
+                }
+            });
+        }
+
+        // 10. 1-Click Upload Local to Supabase
+        if (btnSyncToSupabase) {
+            btnSyncToSupabase.addEventListener("click", async () => {
+                if (!window.BhuviDB || !window.BhuviDB.isSupabaseReady || !window.BhuviDB.isSupabaseReady()) {
+                    showToast("Please save and connect your Supabase credentials first.", "error");
+                    return;
+                }
+                showToast("⚡ Uploading gallery designs, hero banners & inquiries to Supabase...", "info");
+                try {
+                    const stats = await window.BhuviDB.syncLocalToSupabase(appData, inquiries);
+                    if (stats.contentUploaded) {
+                        showToast(`✅ Successfully uploaded to Supabase! (${stats.inquiriesUploaded} bookings synced)`, "success");
+                    } else {
+                        showToast("⚠️ Could not write to site_content table. Ensure you ran supabase_schema.sql in Supabase SQL Editor.", "error");
+                    }
+                } catch (e) {
+                    showToast("Supabase sync error: " + e.message, "error");
+                }
+            });
+        }
+
+        // 11. Pull Live Data from Supabase
+        if (btnPullFromSupabase) {
+            btnPullFromSupabase.addEventListener("click", async () => {
+                if (!window.BhuviDB || !window.BhuviDB.isSupabaseReady || !window.BhuviDB.isSupabaseReady()) {
+                    showToast("Please connect Supabase first.", "error");
+                    return;
+                }
+                showToast("⚡ Fetching latest catalog from Supabase...", "info");
+                try {
+                    const res = await window.BhuviDB.pullSupabaseToLocal();
+                    if (res && res.content) {
+                        appData = res.content;
+                        if (res.inquiries && Array.isArray(res.inquiries) && res.inquiries.length) {
+                            inquiries = res.inquiries;
+                        }
+                        renderAdminBanners();
+                        renderAdminGallery();
+                        renderAdminReviews();
+                        renderAdminInquiries();
+                        updateOverviewStats();
+                        showToast("✅ Loaded live catalog and inquiries from Supabase!", "success");
+                    } else {
+                        showToast("No remote catalog found in Supabase yet. Try '1-Click Upload Local Data to Supabase' first.", "info");
+                    }
+                } catch (e) {
+                    showToast("Failed to pull from Supabase: " + e.message, "error");
                 }
             });
         }

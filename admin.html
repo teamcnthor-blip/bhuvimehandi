@@ -639,6 +639,111 @@
         <!-- ================= 8. TAB: CLOUD DATABASE & PUBLISHING SYNC ================= -->
         <section class="tab-pane" id="tab-database">
 
+            <!-- ================= SUPABASE DATABASE INTEGRATION (RECOMMENDED) ================= -->
+            <div class="card" style="border: 1px solid rgba(62, 207, 142, 0.4); background: linear-gradient(180deg, rgba(62, 207, 142, 0.05) 0%, rgba(26, 20, 20, 0.6) 100%); margin-bottom: 24px;">
+                <div class="card-header" style="align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h2 class="card-title" style="margin: 0; color: #3ecf8e;">⚡ Supabase Cloud Database (PostgreSQL)</h2>
+                            <span id="supabaseStatusPill" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #eab308; display: inline-block;"></span>
+                                Local Storage Mode (Offline)
+                            </span>
+                        </div>
+                        <p class="card-description" style="margin-top: 6px;">
+                            Connect your Supabase project to load bridal gallery and rates directly from the <code>site_content</code> table and receive client booking inquiries into the <code>inquiries</code> table in real time.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary btn-sm" id="btnTestSupabase" style="border-color: rgba(62, 207, 142, 0.4); color: #3ecf8e;">
+                            🔍 Test Supabase Connection
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-grid" style="margin-top: 14px;">
+                    <div class="form-group full-width">
+                        <label class="form-label">Supabase Project URL *</label>
+                        <input type="text" id="sbUrlInput" class="form-control" placeholder="https://your-project-id.supabase.co" style="font-family: monospace;">
+                        <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">Found in Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project URL</small>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Supabase Anon (Public API) Key *</label>
+                        <input type="text" id="sbKeyInput" class="form-control" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-family: monospace;">
+                        <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;">Found in Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project API keys (anon / public)</small>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" id="btnSyncToSupabase" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
+                            ⚡ 1-Click Upload Local Data to Supabase
+                        </button>
+                        <button class="btn btn-secondary" id="btnPullFromSupabase">
+                            📥 Pull Live Supabase Data
+                        </button>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" id="btnClearSupabaseConfig">
+                            Disconnect
+                        </button>
+                        <button class="btn btn-primary" id="btnSaveSupabaseConfig" style="background: #3ecf8e; color: #000; font-weight: 700;">
+                            💾 Save & Connect Supabase
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SQL Table Setup Box -->
+                <div style="margin-top: 20px; padding: 14px 18px; background: rgba(0,0,0,0.35); border-radius: var(--radius-sm); border: 1px solid rgba(62, 207, 142, 0.2);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const el = document.getElementById('sbSqlBox'); el.style.display = el.style.display === 'none' ? 'block' : 'none';">
+                        <div style="font-size: 13px; font-weight: 600; color: #3ecf8e; display: flex; align-items: center; gap: 6px;">
+                            📋 <span>Required Supabase SQL Tables (Click to Expand / Copy)</span>
+                        </div>
+                        <span style="font-size: 11.5px; color: var(--text-muted);">Click to toggle ▾</span>
+                    </div>
+                    <div id="sbSqlBox" style="display: none; margin-top: 12px;">
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">
+                            Run this in your Supabase Dashboard (<strong>SQL Editor &rarr; New Query &rarr; Paste & Run</strong>):
+                        </p>
+                        <textarea readonly style="width: 100%; height: 160px; font-family: monospace; font-size: 11px; background: #0f172a; color: #a3e635; border: 1px solid #334155; border-radius: 4px; padding: 10px; line-height: 1.5;" id="sbSqlSnippet">-- 1. Create site_content table
+CREATE TABLE IF NOT EXISTS public.site_content (
+    id TEXT PRIMARY KEY DEFAULT 'live',
+    data JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.site_content ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read/Write site_content" ON public.site_content FOR ALL USING (true) WITH CHECK (true);
+
+-- 2. Create inquiries table for bridal bookings
+CREATE TABLE IF NOT EXISTS public.inquiries (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    occasion TEXT,
+    event_date TEXT,
+    time_slot TEXT,
+    city TEXT,
+    guests TEXT,
+    package_id TEXT,
+    budget TEXT,
+    notes TEXT,
+    status TEXT DEFAULT 'Pending',
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
+    status_updated_at TIMESTAMPTZ
+);
+ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read/Write inquiries" ON public.inquiries FOR ALL USING (true) WITH CHECK (true);</textarea>
+                        <div style="display: flex; gap: 10px; margin-top: 8px;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('sbSqlSnippet').value); alert('✅ Supabase SQL Schema copied to clipboard! Paste it into Supabase SQL Editor.');">
+                                📋 Copy SQL to Clipboard
+                            </button>
+                            <span style="font-size: 11.5px; color: var(--text-muted); align-self: center;">Also saved in your folder as <code>supabase_schema.sql</code></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Live Cloud Connection Card -->
             <div class="card" style="border: 1px solid rgba(212, 175, 55, 0.3);">
                 <div class="card-header" style="align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
@@ -999,6 +1104,10 @@ service cloud.firestore {
 
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toastContainer"></div>
+
+<!-- Supabase Cloud Database SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase_config.js"></script>
 
 <!-- Firebase Cloud Database SDK (Compat for zero build step) -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
