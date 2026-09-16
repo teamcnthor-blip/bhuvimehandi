@@ -434,11 +434,27 @@
                 .eq("id", "live")
                 .maybeSingle();
 
-            if (!error && data && data.data && typeof data.data === "object") {
-                return data.data;
+            if (error) {
+                console.warn("Supabase site_content query error:", error.message);
+                window._lastSupabaseError = error.message;
+                throw new Error(error.message);
+            }
+
+            if (data && data.data) {
+                let contentData = data.data;
+                if (typeof contentData === "string") {
+                    try {
+                        contentData = JSON.parse(contentData);
+                    } catch (pe) {}
+                }
+                if (contentData && typeof contentData === "object") {
+                    return contentData;
+                }
             }
         } catch (e) {
             console.warn("Supabase site_content query error:", e.message);
+            window._lastSupabaseError = e.message;
+            throw e;
         }
         return null;
     }
@@ -612,7 +628,13 @@
 
     async function pullSupabaseToLocal() {
         if (!isSupabaseReady || !supabaseClient) {
-            throw new Error("Supabase is not connected.");
+            const stored = getStoredSupabaseConfig();
+            if (stored && stored.url && stored.anonKey) {
+                initSupabase(stored);
+            }
+        }
+        if (!isSupabaseReady || !supabaseClient) {
+            throw new Error("Supabase is not connected. Enter your Supabase Project URL and Anon Key, then click 'Save & Connect Supabase'.");
         }
         const content = await supabaseGetSiteContent();
         if (content && typeof content === "object" && content.gallery && content.gallery.length > 0) {

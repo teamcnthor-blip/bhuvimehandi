@@ -1973,7 +1973,7 @@
         if (btnPullFromSupabase) {
             btnPullFromSupabase.addEventListener("click", async () => {
                 if (!window.BhuviDB || !window.BhuviDB.isSupabaseReady || !window.BhuviDB.isSupabaseReady()) {
-                    showToast("Please connect Supabase first.", "error");
+                    showToast("Please enter your Supabase credentials and click 'Save & Connect' first.", "error");
                     return;
                 }
                 showToast("⚡ Fetching latest catalog from Supabase...", "info");
@@ -1991,10 +1991,11 @@
                         updateOverviewStats();
                         showToast("✅ Loaded live catalog and inquiries from Supabase!", "success");
                     } else {
-                        showToast("No remote catalog found in Supabase yet. Try '1-Click Upload Local Data to Supabase' first.", "info");
+                        showToast("ℹ️ Supabase connected, but no catalog found in database. Click '⚡ 1-Click Upload Local Data to Supabase' first to upload your studio photos!", "info");
                     }
                 } catch (e) {
-                    showToast("Failed to pull from Supabase: " + e.message, "error");
+                    console.error("Supabase pull error:", e);
+                    showToast("Failed to pull from Supabase: " + (e.message || e), "error");
                 }
             });
         }
