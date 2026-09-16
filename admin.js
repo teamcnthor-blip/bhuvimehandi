@@ -1917,7 +1917,7 @@
                             try {
                                 showToast("Uploading catalog to Supabase...", "info");
                                 const res = await window.BhuviDB.syncLocalToSupabase(appData, inquiries);
-                                if (res.contentUploaded) {
+                                if (res.contentUploaded || res.content || res.success) {
                                     showToast(`⚡ Studio catalog & ${res.inquiriesUploaded} inquiries uploaded to Supabase successfully!`, "success");
                                 } else {
                                     showToast("Saved config. Ensure you ran the SQL tables script in Supabase SQL Editor.", "info");
@@ -1958,7 +1958,7 @@
                 showToast("⚡ Uploading gallery designs, hero banners & inquiries to Supabase...", "info");
                 try {
                     const stats = await window.BhuviDB.syncLocalToSupabase(appData, inquiries);
-                    if (stats.contentUploaded) {
+                    if (stats.contentUploaded || stats.content || stats.success) {
                         showToast(`✅ Successfully uploaded to Supabase! (${stats.inquiriesUploaded} bookings synced)`, "success");
                     } else {
                         showToast("⚠️ Could not write to site_content table. Ensure you ran supabase_schema.sql in Supabase SQL Editor.", "error");

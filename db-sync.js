@@ -455,8 +455,10 @@
                 });
             if (!error) return true;
             console.warn("Supabase site_content save warning:", error.message);
+            window._lastSupabaseError = error.message;
         } catch (e) {
             console.warn("Supabase site_content save error:", e.message);
+            window._lastSupabaseError = e.message;
         }
         return false;
     }
@@ -479,42 +481,43 @@
                     eventDate: item.event_date,
                     eventDateFormatted: item.event_date,
                     timeSlot: item.time_slot,
-                    city: item.city,
                     venue: item.city,
-                    guests: item.guests,
+                    city: item.city,
                     guestCount: item.guests,
+                    guests: item.guests,
                     packageId: item.package_id,
                     budget: item.budget,
                     notes: item.notes,
                     status: item.status || "New",
-                    submittedAt: item.created_at,
-                    formattedDateSubmitted: item.created_at ? new Date(item.created_at).toLocaleDateString() : ""
+                    createdAt: item.created_at,
+                    formattedDateSubmitted: item.created_at ? new Date(item.created_at).toLocaleDateString("en-IN") : ""
                 }));
             }
         } catch (e) {
-            console.warn("Supabase inquiries query error:", e.message);
+            console.warn("Supabase inquiries fetch error:", e.message);
         }
         return null;
     }
 
-    async function supabaseSaveInquiry(inq) {
-        if (!isSupabaseReady || !supabaseClient) return false;
+    async function supabaseSaveInquiry(inquiry) {
+        if (!isSupabaseReady || !supabaseClient || !inquiry) return false;
         try {
             const row = {
-                id: inq.id || ("INQ-" + Date.now()),
-                name: inq.name || "Unknown",
-                phone: inq.phone || "",
-                occasion: inq.occasion || inq.eventType || "",
-                event_date: inq.eventDate || inq.eventDateFormatted || "",
-                time_slot: inq.timeSlot || "",
-                city: inq.city || inq.venue || "",
-                guests: inq.guests || inq.guestCount || "",
-                package_id: inq.packageId || "",
-                budget: inq.budget || "",
-                notes: inq.notes || "",
-                status: inq.status || "New",
-                created_at: inq.submittedAt || inq.createdAt || new Date().toISOString()
+                id: String(inquiry.id || "inq-" + Date.now()),
+                name: inquiry.name || "Unknown",
+                phone: inquiry.phone || "",
+                occasion: inquiry.occasion || inquiry.eventType || "",
+                event_date: inquiry.eventDate || inquiry.eventDateFormatted || "",
+                time_slot: inquiry.timeSlot || "",
+                city: inquiry.city || inquiry.venue || "",
+                guests: String(inquiry.guests || inquiry.guestCount || "1"),
+                package_id: inquiry.packageId || "",
+                budget: inquiry.budget || "",
+                notes: inquiry.notes || "",
+                status: inquiry.status || "New",
+                created_at: inquiry.createdAt ? new Date(inquiry.createdAt).toISOString() : new Date().toISOString()
             };
+
             const { error } = await supabaseClient
                 .from("inquiries")
                 .upsert(row);
@@ -565,10 +568,10 @@
             const client = window.supabase.createClient(config.url, config.anonKey);
             const { data, error } = await client.from("site_content").select("id").limit(1);
             if (error) {
-                if (error.code === "PGRST204" || error.code === "42P01") {
+                if (error.code === "PGRST204" || error.code === "42P01" || error.message.includes("does not exist") || error.message.includes("not found")) {
                     return {
                         success: false,
-                        message: "Connected to Supabase project, but tables are missing! Please run the SQL schema script in Supabase SQL Editor."
+                        message: "Connected to Supabase project, but the 'site_content' table is missing! Please run the SQL schema script in Supabase SQL Editor."
                     };
                 }
                 return { success: false, message: "Supabase notice: " + error.message };
@@ -588,6 +591,10 @@
 
         if (localAppData) {
             contentOk = await supabaseSaveSiteContent(localAppData);
+            if (!contentOk) {
+                const detail = window._lastSupabaseError || "Table 'site_content' does not exist yet.";
+                throw new Error(detail);
+            }
         }
         if (Array.isArray(localInquiries) && localInquiries.length > 0) {
             for (const inq of localInquiries) {
@@ -595,7 +602,12 @@
                 if (ok) inquiriesCount++;
             }
         }
-        return { content: contentOk, inquiriesUploaded: inquiriesCount };
+        return { 
+            success: contentOk,
+            content: contentOk, 
+            contentUploaded: contentOk, 
+            inquiriesUploaded: inquiriesCount 
+        };
     }
 
     async function pullSupabaseToLocal() {
