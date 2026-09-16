@@ -173,8 +173,8 @@ VALUES (
             }
         ],
         "settings": {
-            "whatsapp": "918320904682",
-            "phone": "+91 83209 04682",
+            "whatsapp": "918094935632",
+            "phone": "+91 80949 35632",
             "email": "prajapatbhavna2003@gmail.com",
             "address": "Near Mohanlal Sukhadia University, Udaipur, Rajasthan 313001",
             "instagram": "bhuvi_mehandi_24",

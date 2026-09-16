@@ -151,8 +151,8 @@
             }
         ],
         settings: {
-            whatsapp: "918320904682",
-            phone: "+91 83209 04682",
+            whatsapp: "918094935632",
+            phone: "+91 80949 35632",
             email: "prajapatbhavna2003@gmail.com",
             address: "Near Mohanlal Sukhadia University, Udaipur, Rajasthan 313001",
             instagram: "bhuvi_mehandi_24",
@@ -1341,8 +1341,8 @@
         const importBackupFile = document.getElementById("importBackupFile");
         const resetFactoryBtn = document.getElementById("resetFactoryBtn");
 
-        if (settingsWaInput) settingsWaInput.value = settings.whatsapp || "918320904682";
-        if (settingsPhoneInput) settingsPhoneInput.value = settings.phone || "+91 83209 04682";
+        if (settingsWaInput) settingsWaInput.value = settings.whatsapp || "918094935632";
+        if (settingsPhoneInput) settingsPhoneInput.value = settings.phone || "+91 80949 35632";
         if (settingsEmailInput) settingsEmailInput.value = settings.email || "";
         if (settingsAddressInput) settingsAddressInput.value = settings.address || "";
         if (settingsInstagramInput) settingsInstagramInput.value = settings.instagram || "bhuvi_mehandi_24";
@@ -1352,7 +1352,7 @@
             saveSettingsBtn.addEventListener("click", () => {
                 appData.settings = {
                     ...appData.settings,
-                    whatsapp: (settingsWaInput.value || "").replace(/\D/g, "") || "918320904682",
+                    whatsapp: (settingsWaInput.value || "").replace(/\D/g, "") || "918094935632",
                     phone: settingsPhoneInput.value.trim(),
                     email: settingsEmailInput.value.trim(),
                     address: settingsAddressInput.value.trim(),

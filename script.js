@@ -1050,7 +1050,7 @@ _Sent via Bhuvi Mehandi Luxury Concierge_`;
         }
 
         // WhatsApp number (check if customized in admin settings)
-        let whatsappNumber = "918320904682";
+        let whatsappNumber = "918094935632";
         try {
             const savedData = JSON.parse(localStorage.getItem("bhuvi_mehndi_data") || "{}");
             if (savedData?.settings?.whatsapp) {
