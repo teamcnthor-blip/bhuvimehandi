@@ -19,7 +19,18 @@ function initBhuviStudio() {
     function renderDynamicGallery(galleryList) {
         const galleryGrid = document.getElementById("galleryGrid");
         const filtersContainer = document.getElementById("galleryFilters");
-        if (!galleryGrid || !filtersContainer || !Array.isArray(galleryList) || !galleryList.length) return;
+        if (!galleryGrid || !filtersContainer || !Array.isArray(galleryList)) return;
+
+        if (galleryList.length === 0) {
+            filtersContainer.innerHTML = `<button class="filter-btn active">All Designs (0)</button>`;
+            galleryGrid.innerHTML = `
+                <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: var(--text-muted, #999); font-size: 15px;">
+                    <div style="font-size: 32px; margin-bottom: 8px;">🎨</div>
+                    <p>No mehndi designs available in the gallery yet.</p>
+                </div>
+            `;
+            return;
+        }
 
         // Calculate counts
         const categoryCounts = { all: galleryList.length };
@@ -307,18 +318,9 @@ function initBhuviStudio() {
             }];
         }
 
-        // If only 1 banner is configured, supplement with default luxury banners so 5-second slide animation always works
-        if (bannersToUse.length === 1) {
-            bannersToUse = [
-                bannersToUse[0],
-                defaultHeroBanners[1],
-                defaultHeroBanners[2]
-            ];
-        } else if (bannersToUse.length === 0) {
-            bannersToUse = defaultHeroBanners;
+        if (bannersToUse.length > 0) {
+            renderHeroCarousel(bannersToUse);
         }
-
-        renderHeroCarousel(bannersToUse);
 
         // 2. Hero / Intro text (if customized)
         if (data.hero) {
@@ -392,13 +394,13 @@ function initBhuviStudio() {
             }
         }
 
-        // 5. Custom Gallery
-        if (Array.isArray(data.gallery) && data.gallery.length > 0) {
+        // 5. Custom Gallery - Always hydrate from database
+        if (Array.isArray(data.gallery)) {
             renderDynamicGallery(data.gallery);
         }
 
-        // 6. Custom Reviews
-        if (Array.isArray(data.reviews) && data.reviews.length > 0) {
+        // 6. Custom Reviews - Always hydrate from database
+        if (Array.isArray(data.reviews)) {
             renderDynamicReviews(data.reviews);
         }
     }
@@ -480,7 +482,16 @@ function initBhuviStudio() {
 
 function renderDynamicReviews(reviewsList) {
     const grid = document.getElementById("reviewsGrid");
-    if (!grid || !Array.isArray(reviewsList) || !reviewsList.length) return;
+    if (!grid || !Array.isArray(reviewsList)) return;
+
+    if (reviewsList.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: var(--text-muted, #999); font-size: 15px;">
+                <p>No bride reviews added yet.</p>
+            </div>
+        `;
+        return;
+    }
 
     grid.innerHTML = reviewsList.map(r => {
         const starsCount = Math.max(1, Math.min(5, parseInt(r.stars, 10) || 5));

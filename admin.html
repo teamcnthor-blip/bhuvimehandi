@@ -706,8 +706,8 @@
                         <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">
                             Run this in your Supabase Dashboard (<strong>SQL Editor &rarr; New Query &rarr; Paste & Run</strong>):
                         </p>
-                        <textarea readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 11px; background: #0f172a; color: #a3e635; border: 1px solid #334155; border-radius: 4px; padding: 10px; line-height: 1.5;" id="sbSqlSnippet">-- ===================================================================
--- BHUVI MEHANDI — SUPABASE TABLES + DATA INSERTION
+                        <textarea readonly style="width: 100%; height: 260px; font-family: monospace; font-size: 11px; background: #0f172a; color: #a3e635; border: 1px solid #334155; border-radius: 4px; padding: 10px; line-height: 1.5;" id="sbSqlSnippet">-- ===================================================================
+-- BHUVI MEHANDI — COMPLETE SUPABASE TABLES SETUP (ALL 5 TABLES)
 -- ===================================================================
 
 -- 1. Table: site_content
@@ -717,7 +717,7 @@ CREATE TABLE IF NOT EXISTS public.site_content (
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
 ALTER TABLE public.site_content ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public read site_content" ON public.site_content FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public all site_content" ON public.site_content;
 CREATE POLICY "Allow public all site_content" ON public.site_content FOR ALL USING (true) WITH CHECK (true);
 
 -- 2. Table: inquiries
@@ -738,6 +738,7 @@ CREATE TABLE IF NOT EXISTS public.inquiries (
     status_updated_at TIMESTAMPTZ
 );
 ALTER TABLE public.inquiries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all inquiries" ON public.inquiries;
 CREATE POLICY "Allow public all inquiries" ON public.inquiries FOR ALL USING (true) WITH CHECK (true);
 
 -- 3. Table: gallery (Relational)
@@ -754,9 +755,36 @@ CREATE TABLE IF NOT EXISTS public.gallery (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
 );
 ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all gallery" ON public.gallery;
 CREATE POLICY "Allow public all gallery" ON public.gallery FOR ALL USING (true) WITH CHECK (true);
 
--- (See full supabase_schema.sql file in your project folder for complete data INSERT statements)</textarea>
+-- 4. Table: hero_banners (Relational)
+CREATE TABLE IF NOT EXISTS public.hero_banners (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    image_url TEXT NOT NULL,
+    display_order INT DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.hero_banners ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all hero_banners" ON public.hero_banners;
+CREATE POLICY "Allow public all hero_banners" ON public.hero_banners FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. Table: reviews (Relational)
+CREATE TABLE IF NOT EXISTS public.reviews (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT,
+    stars INT DEFAULT 5,
+    review_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now())
+);
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public all reviews" ON public.reviews;
+CREATE POLICY "Allow public all reviews" ON public.reviews FOR ALL USING (true) WITH CHECK (true);
+
+-- (See supabase_schema.sql for sample catalog data INSERT statements)</textarea>
                         <div style="display: flex; gap: 10px; margin-top: 8px;">
                             <button type="button" class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('sbSqlSnippet').value); alert('✅ Supabase SQL Schema copied to clipboard! Paste it into Supabase SQL Editor.');">
                                 📋 Copy SQL to Clipboard

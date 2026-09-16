@@ -208,7 +208,7 @@
             const raw = localStorage.getItem(DATA_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === "object" && parsed.gallery && parsed.gallery.length) {
+                if (parsed && typeof parsed === "object") {
                     loaded = parsed;
                 }
             }
@@ -222,12 +222,18 @@
             updateOverviewStats();
         }
 
-        // 2. Authoritative Multi-Device Load via BhuviDB
+        // 2. Authoritative Multi-Device Load via BhuviDB (Supabase / Server / Cloud)
         if (window.BhuviDB && typeof window.BhuviDB.getSiteContent === "function") {
             try {
                 const authoritativeData = await window.BhuviDB.getSiteContent();
-                if (authoritativeData && typeof authoritativeData === "object" && authoritativeData.gallery && authoritativeData.gallery.length) {
+                if (authoritativeData && typeof authoritativeData === "object") {
                     appData = authoritativeData;
+                    renderAdminBanners();
+                    renderAdminGallery();
+                    renderAdminReviews();
+                    initAboutSection();
+                    initSettingsSection();
+                    updateOverviewStats();
                 }
             } catch (err) {
                 console.warn("BhuviDB load error:", err);
@@ -237,23 +243,30 @@
         // 3. Fallback to IndexedDB if appData is still missing
         if (!appData) {
             const idbData = await idbGet(DATA_KEY);
-            if (idbData && typeof idbData === "object" && idbData.gallery && idbData.gallery.length) {
+            if (idbData && typeof idbData === "object") {
                 appData = idbData;
+                renderAdminBanners();
+                renderAdminGallery();
+                renderAdminReviews();
+                initAboutSection();
+                initSettingsSection();
+                updateOverviewStats();
             }
         }
 
-        // 4. ONLY if appData is STILL null after ALL 4 sources checked, initialize with DEFAULT_DATA
+        // 4. ONLY if appData is STILL null after ALL sources checked, initialize with in-memory DEFAULT_DATA
+        // CRITICAL FIX: NEVER call saveSiteContent here! That was overwriting database content!
         if (!appData) {
-            console.info("ℹ️ No existing data found in server/cloud/local DB. Initializing luxury default catalog.");
+            console.info("ℹ️ No existing data found in server/cloud/local DB. Initializing in-memory default catalog.");
             appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
-            if (window.BhuviDB && typeof window.BhuviDB.saveSiteContent === "function") {
-                window.BhuviDB.saveSiteContent(appData);
-            }
         }
 
-        if (!Array.isArray(appData.heroBanners) || appData.heroBanners.length === 0) {
-            appData.heroBanners = JSON.parse(JSON.stringify(DEFAULT_DATA.heroBanners));
-        }
+        // Ensure collections are properly initialized arrays
+        if (!Array.isArray(appData.gallery)) appData.gallery = [];
+        if (!Array.isArray(appData.heroBanners)) appData.heroBanners = [];
+        if (!Array.isArray(appData.reviews)) appData.reviews = [];
+        if (!appData.about) appData.about = {};
+        if (!appData.settings) appData.settings = {};
 
         // 5. Inquiries Loading
         if (window.BhuviDB && typeof window.BhuviDB.getInquiries === "function") {
@@ -680,18 +693,7 @@
             const title = item ? item.title : "this banner";
             if (confirm(`Are you sure you want to remove banner slide "${title}"?`)) {
                 appData.heroBanners = list.filter(b => b.id !== id);
-                if (appData.heroBanners.length === 0) {
-                    appData.heroBanners = [
-                        {
-                            id: "banner-default",
-                            image: "hero-banner.png",
-                            title: "Bhuvi Mehandi Luxury Henna Art"
-                        }
-                    ];
-                    showToast("At least one default slide retained.", "info");
-                } else {
-                    showToast("Banner slide removed.", "success");
-                }
+                showToast("Banner slide removed.", "success");
                 saveState();
                 renderAdminBanners();
             }
@@ -1986,12 +1988,14 @@
                     const res = await window.BhuviDB.pullSupabaseToLocal();
                     if (res && res.content) {
                         appData = res.content;
-                        if (res.inquiries && Array.isArray(res.inquiries) && res.inquiries.length) {
+                        if (Array.isArray(res.inquiries)) {
                             inquiries = res.inquiries;
                         }
                         renderAdminBanners();
                         renderAdminGallery();
                         renderAdminReviews();
+                        initAboutSection();
+                        initSettingsSection();
                         renderInquiriesTable();
                         updateOverviewStats();
                         broadcastUpdate();

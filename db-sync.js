@@ -470,17 +470,21 @@
                 .select("*")
                 .order("display_order", { ascending: true });
 
-            if (!gErr && Array.isArray(galleryRows) && galleryRows.length > 0) {
-                content.gallery = galleryRows.map(r => ({
-                    id: r.id || ("gal-" + Math.random().toString(36).substr(2, 6)),
-                    title: r.title || "Mehndi Design",
-                    category: (r.category || "bridal").toLowerCase(),
-                    categoryLabel: r.category_label || (r.category ? r.category.toUpperCase() : "MEHNDI"),
-                    subtitle: r.subtitle || r.title || "Royal Henna",
-                    src: r.image_url || r.src || "",
-                    alt: r.alt_text || r.title || "Mehndi Design",
-                    isLarge: !!r.is_large
-                }));
+            if (!gErr && Array.isArray(galleryRows)) {
+                if (galleryRows.length > 0) {
+                    content.gallery = galleryRows.map(r => ({
+                        id: String(r.id || ("gal-" + Math.random().toString(36).substr(2, 6))),
+                        title: r.title || "Mehndi Design",
+                        category: (r.category || "bridal").toLowerCase(),
+                        categoryLabel: r.category_label || (r.category ? r.category.toUpperCase() : "MEHNDI"),
+                        subtitle: r.subtitle || r.title || "Royal Henna",
+                        src: r.image_url || r.src || "",
+                        alt: r.alt_text || r.title || "Mehndi Design",
+                        isLarge: !!r.is_large
+                    }));
+                } else if (!Array.isArray(content.gallery)) {
+                    content.gallery = [];
+                }
             }
         } catch (ge) {}
 
@@ -491,14 +495,16 @@
                 .select("*")
                 .order("display_order", { ascending: true });
 
-            if (!bErr && Array.isArray(bannerRows) && bannerRows.length > 0) {
+            if (!bErr && Array.isArray(bannerRows)) {
                 const activeBanners = bannerRows.filter(b => b.is_active !== false);
                 if (activeBanners.length > 0) {
-                    content.heroBanners = activeBanners.map(b => ({
-                        id: b.id || ("banner-" + Math.random().toString(36).substr(2, 6)),
+                    content.heroBanners = activeBanners.map((b, idx) => ({
+                        id: String(b.id || ("banner-" + (idx + 1))),
                         title: b.title || "Bhuvi Mehandi Luxury Henna Art",
                         image: b.image_url || b.image || "hero-banner.png"
                     }));
+                } else if (!Array.isArray(content.heroBanners)) {
+                    content.heroBanners = [];
                 }
             }
         } catch (be) {}
@@ -510,21 +516,26 @@
                 .select("*")
                 .order("created_at", { ascending: false });
 
-            if (!rErr && Array.isArray(reviewRows) && reviewRows.length > 0) {
-                content.reviews = reviewRows.map(r => ({
-                    id: r.id || ("rev-" + Math.random().toString(36).substr(2, 6)),
-                    name: r.name || "Happy Bride",
-                    role: r.role || "Bride • Udaipur",
-                    stars: parseInt(r.stars, 10) || 5,
-                    text: r.review_text || r.text || ""
-                }));
+            if (!rErr && Array.isArray(reviewRows)) {
+                if (reviewRows.length > 0) {
+                    content.reviews = reviewRows.map((r, idx) => ({
+                        id: String(r.id || ("rev-" + (idx + 1))),
+                        name: r.name || "Happy Bride",
+                        role: r.role || "Bride • Udaipur",
+                        stars: parseInt(r.stars, 10) || 5,
+                        text: r.review_text || r.text || ""
+                    }));
+                } else if (!Array.isArray(content.reviews)) {
+                    content.reviews = [];
+                }
             }
         } catch (re) {}
 
         // Return content if any catalog data is present
-        if (content && (
-            (Array.isArray(content.gallery) && content.gallery.length > 0) ||
-            (Array.isArray(content.heroBanners) && content.heroBanners.length > 0) ||
+        if (content && typeof content === "object" && (
+            Array.isArray(content.gallery) ||
+            Array.isArray(content.heroBanners) ||
+            Array.isArray(content.reviews) ||
             content.about ||
             content.hero ||
             content.settings
@@ -562,50 +573,117 @@
             window._lastSupabaseError = e.message;
         }
 
-        // 2. Also keep relational 'gallery' table in sync
-        if (Array.isArray(content.gallery) && content.gallery.length > 0) {
+        // 2. Keep relational 'gallery' table in sync (including deleting removed items)
+        if (Array.isArray(content.gallery)) {
             try {
-                const gRows = content.gallery.map((g, idx) => ({
-                    id: String(g.id || "gal-" + (idx + 1)),
-                    title: g.title || "Mehndi Design",
-                    category: (g.category || "bridal").toLowerCase(),
-                    category_label: g.categoryLabel || g.category || "Bridal",
-                    subtitle: g.subtitle || g.title || "Royal Henna",
-                    image_url: g.src || g.image_url || "",
-                    alt_text: g.alt || g.title || "Mehndi Design",
-                    is_large: !!g.isLarge,
-                    display_order: idx + 1
-                }));
-                await supabaseClient.from("gallery").upsert(gRows);
-            } catch (ge) {}
+                if (content.gallery.length > 0) {
+                    const gRows = content.gallery.map((g, idx) => ({
+                        id: String(g.id || "gal-" + (idx + 1)),
+                        title: g.title || "Mehndi Design",
+                        category: (g.category || "bridal").toLowerCase(),
+                        category_label: g.categoryLabel || g.category || "Bridal",
+                        subtitle: g.subtitle || g.title || "Royal Henna",
+                        image_url: g.src || g.image_url || "",
+                        alt_text: g.alt || g.title || "Mehndi Design",
+                        is_large: !!g.isLarge,
+                        display_order: idx + 1
+                    }));
+                    await supabaseClient.from("gallery").upsert(gRows);
+
+                    // Delete items removed from gallery
+                    const activeIds = gRows.map(r => r.id);
+                    const { data: existingRows } = await supabaseClient.from("gallery").select("id");
+                    if (Array.isArray(existingRows) && existingRows.length > 0) {
+                        const toDelete = existingRows
+                            .map(r => String(r.id))
+                            .filter(id => !activeIds.includes(id));
+                        if (toDelete.length > 0) {
+                            await supabaseClient.from("gallery").delete().in("id", toDelete);
+                        }
+                    }
+                } else {
+                    // All gallery items removed
+                    const { data: existingRows } = await supabaseClient.from("gallery").select("id");
+                    if (Array.isArray(existingRows) && existingRows.length > 0) {
+                        const toDelete = existingRows.map(r => String(r.id));
+                        await supabaseClient.from("gallery").delete().in("id", toDelete);
+                    }
+                }
+            } catch (ge) {
+                console.warn("Notice syncing gallery table:", ge.message);
+            }
         }
 
-        // 3. Also keep relational 'hero_banners' table in sync
-        if (Array.isArray(content.heroBanners) && content.heroBanners.length > 0) {
+        // 3. Keep relational 'hero_banners' table in sync (including deleting removed items)
+        if (Array.isArray(content.heroBanners)) {
             try {
-                const bRows = content.heroBanners.map((b, idx) => ({
-                    id: String(b.id || "banner-" + (idx + 1)),
-                    title: b.title || "Hero Banner " + (idx + 1),
-                    image_url: b.image || b.image_url || "hero-banner.png",
-                    display_order: idx + 1,
-                    is_active: true
-                }));
-                await supabaseClient.from("hero_banners").upsert(bRows);
-            } catch (be) {}
+                if (content.heroBanners.length > 0) {
+                    const bRows = content.heroBanners.map((b, idx) => ({
+                        id: String(b.id || "banner-" + (idx + 1)),
+                        title: b.title || "Hero Banner " + (idx + 1),
+                        image_url: b.image || b.image_url || "hero-banner.png",
+                        display_order: idx + 1,
+                        is_active: true
+                    }));
+                    await supabaseClient.from("hero_banners").upsert(bRows);
+
+                    // Delete banners removed
+                    const activeIds = bRows.map(r => r.id);
+                    const { data: existingBanners } = await supabaseClient.from("hero_banners").select("id");
+                    if (Array.isArray(existingBanners) && existingBanners.length > 0) {
+                        const toDelete = existingBanners
+                            .map(r => String(r.id))
+                            .filter(id => !activeIds.includes(id));
+                        if (toDelete.length > 0) {
+                            await supabaseClient.from("hero_banners").delete().in("id", toDelete);
+                        }
+                    }
+                } else {
+                    const { data: existingBanners } = await supabaseClient.from("hero_banners").select("id");
+                    if (Array.isArray(existingBanners) && existingBanners.length > 0) {
+                        const toDelete = existingBanners.map(r => String(r.id));
+                        await supabaseClient.from("hero_banners").delete().in("id", toDelete);
+                    }
+                }
+            } catch (be) {
+                console.warn("Notice syncing hero_banners table:", be.message);
+            }
         }
 
-        // 4. Also keep relational 'reviews' table in sync
-        if (Array.isArray(content.reviews) && content.reviews.length > 0) {
+        // 4. Keep relational 'reviews' table in sync (including deleting removed items)
+        if (Array.isArray(content.reviews)) {
             try {
-                const rRows = content.reviews.map((r, idx) => ({
-                    id: String(r.id || "rev-" + (idx + 1)),
-                    name: r.name || "Bride",
-                    role: r.role || "Bride • Udaipur",
-                    stars: parseInt(r.stars, 10) || 5,
-                    review_text: r.text || r.review_text || ""
-                }));
-                await supabaseClient.from("reviews").upsert(rRows);
-            } catch (re) {}
+                if (content.reviews.length > 0) {
+                    const rRows = content.reviews.map((r, idx) => ({
+                        id: String(r.id || "rev-" + (idx + 1)),
+                        name: r.name || "Bride",
+                        role: r.role || "Bride • Udaipur",
+                        stars: parseInt(r.stars, 10) || 5,
+                        review_text: r.text || r.review_text || ""
+                    }));
+                    await supabaseClient.from("reviews").upsert(rRows);
+
+                    // Delete reviews removed
+                    const activeIds = rRows.map(r => r.id);
+                    const { data: existingReviews } = await supabaseClient.from("reviews").select("id");
+                    if (Array.isArray(existingReviews) && existingReviews.length > 0) {
+                        const toDelete = existingReviews
+                            .map(r => String(r.id))
+                            .filter(id => !activeIds.includes(id));
+                        if (toDelete.length > 0) {
+                            await supabaseClient.from("reviews").delete().in("id", toDelete);
+                        }
+                    }
+                } else {
+                    const { data: existingReviews } = await supabaseClient.from("reviews").select("id");
+                    if (Array.isArray(existingReviews) && existingReviews.length > 0) {
+                        const toDelete = existingReviews.map(r => String(r.id));
+                        await supabaseClient.from("reviews").delete().in("id", toDelete);
+                    }
+                }
+            } catch (re) {
+                console.warn("Notice syncing reviews table:", re.message);
+            }
         }
 
         return success;
@@ -714,17 +792,36 @@
         }
         try {
             const client = window.supabase.createClient(config.url, config.anonKey);
-            const { data, error } = await client.from("site_content").select("id").limit(1);
-            if (error) {
-                if (error.code === "PGRST204" || error.code === "42P01" || error.message.includes("does not exist") || error.message.includes("not found")) {
-                    return {
-                        success: false,
-                        message: "Connected to Supabase project, but the 'site_content' table is missing! Please run the SQL schema script in Supabase SQL Editor."
-                    };
+            const tables = ["site_content", "inquiries", "gallery", "hero_banners", "reviews"];
+            const missing = [];
+            let siteContentOk = false;
+
+            for (const tbl of tables) {
+                try {
+                    const { error } = await client.from(tbl).select("id").limit(1);
+                    if (error) {
+                        missing.push(tbl);
+                    } else if (tbl === "site_content") {
+                        siteContentOk = true;
+                    }
+                } catch (e) {
+                    missing.push(tbl);
                 }
-                return { success: false, message: "Supabase notice: " + error.message };
             }
-            return { success: true, message: "Connection successful! Supabase tables are online and connected." };
+
+            if (missing.length === 0) {
+                return { success: true, message: "Connection successful! All 5 tables (site_content, inquiries, gallery, hero_banners, reviews) are online and verified." };
+            } else if (siteContentOk) {
+                return { 
+                    success: true, 
+                    message: `Connected to Supabase! Note: ${missing.length} relational table(s) (${missing.join(", ")}) not created yet. Copy and run the SQL schema script below for full table support.` 
+                };
+            } else {
+                return {
+                    success: false,
+                    message: `Connected to Supabase project, but tables are missing (${missing.join(", ")}). Please copy and run the SQL schema script in Supabase SQL Editor.`
+                };
+            }
         } catch (err) {
             return { success: false, message: err.message || "Failed to reach Supabase project." };
         }
