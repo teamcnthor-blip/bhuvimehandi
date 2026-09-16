@@ -689,6 +689,85 @@
         return success;
     }
 
+    /**
+     * Submit a single client review directly to the 'reviews' Supabase table.
+     * SAFE: Only inserts the new row — never touches other reviews or saveSiteContent.
+     * Works identically on both desktop and mobile because it does NOT rely on localStorage.
+     */
+    async function submitReview(reviewData) {
+        if (!reviewData || !reviewData.id) return { success: false, error: "Missing review data" };
+
+        const row = {
+            id: String(reviewData.id),
+            name: reviewData.name || "Happy Bride",
+            role: reviewData.role || "Bride • Udaipur",
+            stars: parseInt(reviewData.stars, 10) || 5,
+            review_text: reviewData.text || reviewData.review_text || ""
+        };
+
+        // 1. Try Supabase first (always available on both desktop and mobile)
+        if (!isSupabaseReady || !supabaseClient) {
+            const sbCfg = getStoredSupabaseConfig();
+            if (sbCfg) initSupabase(sbCfg);
+        }
+        if (isSupabaseReady && supabaseClient) {
+            try {
+                const { error } = await supabaseClient.from("reviews").upsert(row);
+                if (!error) {
+                    console.log("⚡ BhuviDB: Review saved to Supabase reviews table:", row.id);
+                    // Broadcast so all open tabs re-render reviews
+                    try {
+                        if (typeof BroadcastChannel !== "undefined") {
+                            const bc = new BroadcastChannel("bhuvi_studio_channel");
+                            bc.postMessage({ type: "DATA_UPDATED", timestamp: Date.now() });
+                            bc.close();
+                        }
+                    } catch (e) {}
+                    return { success: true, supabase: true };
+                } else {
+                    console.warn("⚠️ BhuviDB: Supabase review insert notice:", error.message);
+                }
+            } catch (e) {
+                console.warn("⚠️ BhuviDB: Supabase review insert error:", e.message);
+            }
+        }
+
+        // 2. Fallback: save to Cloud Firestore
+        if (isCloudReady && dbInstance) {
+            try {
+                await dbInstance.collection("reviews").doc(row.id).set(row);
+                console.log("☁️ BhuviDB: Review saved to Cloud Firestore:", row.id);
+                return { success: true, cloud: true };
+            } catch (e) {
+                console.warn("⚠️ BhuviDB: Firestore review save error:", e.message);
+            }
+        }
+
+        // 3. Fallback: save to local IndexedDB + localStorage so it shows immediately
+        try {
+            const cached = await idbGet(LOCAL_DATA_KEY) || {};
+            if (!Array.isArray(cached.reviews)) cached.reviews = [];
+            // Remove duplicate if re-submitting same id
+            cached.reviews = cached.reviews.filter(r => String(r.id) !== String(row.id));
+            cached.reviews.unshift({
+                id: row.id,
+                name: row.name,
+                role: row.role,
+                stars: row.stars,
+                text: row.review_text
+            });
+            await idbSet(LOCAL_DATA_KEY, cached);
+            try {
+                localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(cached));
+            } catch (e) {}
+            return { success: true, local: true };
+        } catch (e) {
+            console.warn("BhuviDB: Review local fallback error:", e);
+        }
+
+        return { success: false, error: "All storage backends failed" };
+    }
+
     async function supabaseGetInquiries() {
         if (!isSupabaseReady || !supabaseClient) return null;
         try {
@@ -1642,6 +1721,8 @@
        8. PUBLIC EXPOSURE VIA GLOBAL NAMESPACE
        ------------------------------------------------------------- */
     window.BhuviDB = {
+        // Client Review
+        submitReview: submitReview,
         // Supabase Cloud Exports
         initSupabase: initSupabase,
         isSupabaseReady: () => isSupabaseReady,

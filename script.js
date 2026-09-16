@@ -535,7 +535,7 @@ window.closeClientReviewModal = function (event) {
     document.body.style.overflow = "";
 };
 
-window.submitClientReview = function (event) {
+window.submitClientReview = async function (event) {
     event.preventDefault();
     const nameInput = document.getElementById("clientRevName");
     const roleInput = document.getElementById("clientRevRole");
@@ -557,46 +557,67 @@ window.submitClientReview = function (event) {
     const newReview = {
         id: "rev-" + Date.now(),
         name,
-        role,
+        role: role || "Bride • Udaipur",
         stars,
         text,
         date: new Date().toISOString()
     };
 
     try {
-        let data = JSON.parse(localStorage.getItem("bhuvi_mehndi_data") || "{}");
-        if (!data.reviews || !Array.isArray(data.reviews)) {
-            data.reviews = [
-                {
-                    id: "rev-1",
-                    name: "Pooja Rathore",
-                    role: "Destination Bride • Jagmandir Palace, Udaipur",
-                    stars: 5,
-                    text: "Bhuvi is an absolute magician! She drew our destination wedding story and hidden portraits so exquisitely on my hands. The stain on my wedding day was pitch dark and lasted for over 3 weeks. Highly recommend her to every Udaipur bride!"
-                },
-                {
-                    id: "rev-2",
-                    name: "Ananya Singhal",
-                    role: "Royal Wedding • The Oberoi Udaivilas, Udaipur",
-                    stars: 5,
-                    text: "The patience and precision Bhuvi has is unmatched. She arrived on time at our resort, brought natural organic henna that smelled heavenly, and created the cleanest fine lines I've ever seen. Every single wedding guest was mesmerized!"
-                },
-                {
-                    id: "rev-3",
-                    name: "Sneha Sharma",
-                    role: "Sangeet & Bridal • Aurika, Udaipur",
-                    stars: 5,
-                    text: "Booked Bhuvi for my engagement and then again for my sister's wedding group. Her designs are super modern, chic, and the color payoff is extraordinary. She is polite, gentle, and a true artist!"
-                }
-            ];
+        // ✅ FIXED: Use BhuviDB.submitReview() which inserts ONLY this new row
+        // directly into the Supabase 'reviews' table — no localStorage read,
+        // no hardcoded defaults, works the same on desktop AND mobile.
+        let result = null;
+        if (window.BhuviDB && typeof window.BhuviDB.submitReview === "function") {
+            result = await window.BhuviDB.submitReview(newReview);
         }
 
-        data.reviews.unshift(newReview);
-        localStorage.setItem("bhuvi_mehndi_data", JSON.stringify(data));
-        if (window.BhuviDB && typeof window.BhuviDB.saveSiteContent === "function") {
-            window.BhuviDB.saveSiteContent(data);
+        if (!result || !result.success) {
+            // If all cloud/db paths failed, at least show it in local UI
+            console.warn("Review cloud save notice. Showing locally.");
         }
-        renderDynamicReviews(data.reviews);
+
+        // Re-fetch authoritative reviews from Supabase so UI is always accurate
+        if (window.BhuviDB && typeof window.BhuviDB.getSiteContent === "function") {
+            const fresh = await window.BhuviDB.getSiteContent();
+            if (fresh && Array.isArray(fresh.reviews)) {
+                renderDynamicReviews(fresh.reviews);
+            } else {
+                // Fallback: just prepend the new review visually
+                const existingGrid = document.getElementById("reviewsGrid");
+                if (existingGrid) {
+                    const starsStr = "★".repeat(Math.max(1, Math.min(5, stars)));
+                    const tempCard = document.createElement("div");
+                    tempCard.className = "testimonial-card reveal show";
+                    tempCard.innerHTML = `
+                        <div class="stars">${starsStr}</div>
+                        <p>"${escapeHtml(text)}"</p>
+                        <div class="review-author">
+                            <strong>${escapeHtml(name)}</strong>
+                            <span>${escapeHtml(role || "Bride • Udaipur")}</span>
+                        </div>
+                    `;
+                    existingGrid.insertBefore(tempCard, existingGrid.firstChild);
+                }
+            }
+        } else {
+            // No BhuviDB — just prepend visually
+            const existingGrid = document.getElementById("reviewsGrid");
+            if (existingGrid) {
+                const starsStr = "★".repeat(Math.max(1, Math.min(5, stars)));
+                const tempCard = document.createElement("div");
+                tempCard.className = "testimonial-card reveal show";
+                tempCard.innerHTML = `
+                    <div class="stars">${starsStr}</div>
+                    <p>"${escapeHtml(text)}"</p>
+                    <div class="review-author">
+                        <strong>${escapeHtml(name)}</strong>
+                        <span>${escapeHtml(role || "Bride • Udaipur")}</span>
+                    </div>
+                `;
+                existingGrid.insertBefore(tempCard, existingGrid.firstChild);
+            }
+        }
 
         window.closeClientReviewModal();
         nameInput.value = "";
