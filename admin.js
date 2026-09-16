@@ -276,7 +276,7 @@
         renderAdminBanners();
         renderAdminGallery();
         renderAdminReviews();
-        renderAdminInquiries();
+        renderInquiriesTable();
         updateOverviewStats();
 
         // 6. Listen for Real-Time Client Inquiries from live website or other devices
@@ -289,7 +289,7 @@
                         const latest = liveInqs[0];
                         showToast(`🔔 New Booking Inquiry received from ${latest.name || "a bride"}!`, "success");
                     }
-                    renderAdminInquiries();
+                    renderInquiriesTable();
                     updateOverviewStats();
                 }
             });
@@ -1275,6 +1275,10 @@
         }).join("");
     }
 
+    function renderAdminInquiries() {
+        renderInquiriesTable();
+    }
+
     function initInquiriesSection() {
         renderInquiriesTable();
 
@@ -1848,7 +1852,7 @@
                     renderAdminBanners();
                     renderAdminGallery();
                     renderAdminReviews();
-                    renderAdminInquiries();
+                    renderInquiriesTable();
                     updateOverviewStats();
                     showToast("✅ Successfully loaded live Cloud data to local storage!", "success");
                 } catch (e) {
@@ -1987,7 +1991,7 @@
                         renderAdminBanners();
                         renderAdminGallery();
                         renderAdminReviews();
-                        renderAdminInquiries();
+                        renderInquiriesTable();
                         updateOverviewStats();
                         showToast("✅ Loaded live catalog and inquiries from Supabase!", "success");
                     } else {
