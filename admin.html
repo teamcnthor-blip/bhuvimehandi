@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Admin Portal | Bhuvi Mehandi Udaipur</title>
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo.png">
+
+    <!-- Admin Stylesheet -->
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- ================= AUTH LOCK SCREEN ================= -->
+<div class="lock-overlay" id="lockOverlay">
+    <div class="lock-card">
+        <img src="logo.png" alt="Bhuvi Mehandi Logo" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); margin: 0 auto 12px; display: block; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);">
+        <div class="lock-logo">Bhuvi Mehandi</div>
+        <div class="lock-subtitle">Studio Administration & Content Manager</div>
+
+        <form id="adminLoginForm" onsubmit="event.preventDefault();" style="text-align: left;">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="color: var(--text-secondary); font-size: 12.5px;">Admin Username</label>
+                <input
+                    type="text"
+                    id="adminUsernameInput"
+                    class="form-control"
+                    placeholder="Enter username"
+                    value="admin"
+                    autocomplete="username"
+                    required
+                >
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label" style="color: var(--text-secondary); font-size: 12.5px;">Admin Password</label>
+                <input
+                    type="password"
+                    id="adminPasswordInput"
+                    class="form-control"
+                    placeholder="Enter password"
+                    autocomplete="current-password"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <button type="button" class="btn btn-primary" id="loginBtn" style="width: 100%; padding: 12px; font-size: 14.5px;">
+                ✦ Sign In to Studio Portal
+            </button>
+        </form>
+
+        <div class="lock-hint" style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+            <div>Default Username: <strong style="color: var(--gold-light);">admin</strong></div>
+            <div>Default Password: <strong style="color: var(--gold-light);">admin123</strong> (or 1234)</div>
+            <div style="margin-top: 4px; font-size: 11px;">Changeable in Studio Settings tab</div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ================= SIDEBAR BACKDROP OVERLAY ================= -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ================= SIDEBAR NAVIGATION ================= -->
+<aside class="admin-sidebar">
+    <div class="sidebar-header">
+        <a href="#" class="sidebar-brand">
+            <img src="logo.png" alt="Bhuvi Studio Logo" class="brand-icon-img" width="38" height="38">
+            <div>
+                <div class="brand-name">Bhuvi Studio</div>
+                <div class="brand-badge">Admin Dashboard</div>
+            </div>
+        </a>
+    </div>
+
+    <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="overview">
+            <span class="nav-icon">📊</span>
+            <span>Studio Overview</span>
+        </button>
+
+        <button class="nav-item" data-tab="hero">
+            <span class="nav-icon">🖼️</span>
+            <span>Hero Section Photo</span>
+        </button>
+
+        <button class="nav-item" data-tab="gallery">
+            <span class="nav-icon">🎨</span>
+            <span>Portfolio & Gallery</span>
+        </button>
+
+        <button class="nav-item" data-tab="about">
+            <span class="nav-icon">👤</span>
+            <span>About Artist Photo</span>
+        </button>
+
+        <button class="nav-item" data-tab="reviews">
+            <span class="nav-icon">⭐</span>
+            <span>Bride Reviews</span>
+        </button>
+
+        <button class="nav-item" data-tab="inquiries">
+            <span class="nav-icon">📋</span>
+            <span>Booking Inquiries</span>
+            <span class="nav-badge" id="badgeInquiriesCount">0</span>
+        </button>
+
+        <button class="nav-item" data-tab="settings">
+            <span class="nav-icon">⚙️</span>
+            <span>Studio Settings</span>
+        </button>
+
+        <button class="nav-item" data-tab="database">
+            <span class="nav-icon">☁️</span>
+            <span>Cloud Database</span>
+            <span class="nav-badge" id="badgeCloudStatus" style="background: rgba(234, 179, 8, 0.18); color: #eab308; font-size: 10px;">Local</span>
+        </button>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="index.html" target="_blank" class="btn btn-secondary btn-sm" style="width: 100%;">
+            🌐 View Live Website ↗
+        </a>
+        <button id="logoutBtn" class="btn btn-danger btn-sm" style="width: 100%;">
+            🔒 Lock Portal
+        </button>
+    </div>
+</aside>
+
+
+<!-- ================= MAIN CONTENT WRAPPER ================= -->
+<main class="admin-main">
+
+    <!-- TOPBAR -->
+    <header class="admin-topbar">
+        <div class="topbar-left">
+            <button class="menu-toggle-btn" id="menuToggleBtn" aria-label="Toggle Navigation">☰</button>
+            <h1 class="page-title" id="pageTitle">Studio Overview</h1>
+        </div>
+
+        <div class="topbar-actions">
+            <a href="index.html" target="_blank" class="btn btn-secondary btn-sm">
+                <span>🌐</span> <span class="btn-text">View Website</span> ↗
+            </a>
+        </div>
+    </header>
+
+    <!-- CONTENT BODY -->
+    <div class="admin-content">
+
+        <!-- ================= 1. TAB: OVERVIEW ================= -->
+        <section class="tab-pane active" id="tab-overview">
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper stat-icon-gold">🎨</div>
+                    <div class="stat-info">
+                        <h3 id="statGalleryCount">8</h3>
+                        <p>Total Gallery Designs</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper stat-icon-maroon">📋</div>
+                    <div class="stat-info">
+                        <h3 id="statInquiriesCount">0</h3>
+                        <p>Customer Inquiries</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper stat-icon-green">🏷️</div>
+                    <div class="stat-info">
+                        <h3 id="statCategoriesCount">5</h3>
+                        <p>Active Categories</p>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon-wrapper stat-icon-blue">💬</div>
+                    <div class="stat-info">
+                        <h3 style="font-size: 16px;">Active</h3>
+                        <p>WhatsApp Concierge</p>
+                    </div>
+                </div>
+
+                <div class="stat-card" onclick="document.querySelector('[data-tab=database]').click()" style="cursor: pointer;">
+                    <div class="stat-icon-wrapper" id="statCloudIconWrapper" style="background: rgba(234, 179, 8, 0.15); color: #eab308;">☁️</div>
+                    <div class="stat-info">
+                        <h3 id="statCloudStatus" style="font-size: 15px; color: #eab308;">Local Mode</h3>
+                        <p id="statCloudSub">Click to Connect Cloud</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Action Cards -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">⚡ Quick Management Actions</h2>
+                        <p class="card-description">Easily update your website photos, gallery collections, and client settings.</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+                    <button class="btn btn-secondary" style="padding: 16px; justify-content: flex-start;" onclick="document.querySelector('[data-tab=gallery]').click()">
+                        <span style="font-size: 24px;">📸</span>
+                        <div style="text-align: left;">
+                            <strong>Add / Manage Gallery Photos</strong>
+                            <div style="font-size: 11.5px; color: var(--text-muted);">Upload bridal, arabic, and rajasthani designs</div>
+                        </div>
+                    </button>
+
+                    <button class="btn btn-secondary" style="padding: 16px; justify-content: flex-start;" onclick="document.querySelector('[data-tab=hero]').click()">
+                        <span style="font-size: 24px;">🖼️</span>
+                        <div style="text-align: left;">
+                            <strong>Change Hero Banner Photo</strong>
+                            <div style="font-size: 11.5px; color: var(--text-muted);">Update the main landing page showcase image</div>
+                        </div>
+                    </button>
+
+                    <button class="btn btn-secondary" style="padding: 16px; justify-content: flex-start;" onclick="document.querySelector('[data-tab=inquiries]').click()">
+                        <span style="font-size: 24px;">💌</span>
+                        <div style="text-align: left;">
+                            <strong>Check Customer Booking Requests</strong>
+                            <div style="font-size: 11.5px; color: var(--text-muted);">View new bridal leads & reply on WhatsApp</div>
+                        </div>
+                    </button>
+
+                    <button class="btn btn-secondary" style="padding: 16px; justify-content: flex-start;" onclick="document.querySelector('[data-tab=reviews]').click()">
+                        <span style="font-size: 24px;">⭐</span>
+                        <div style="text-align: left;">
+                            <strong>Manage Bride Reviews</strong>
+                            <div style="font-size: 11.5px; color: var(--text-muted);">Add, edit, or feature client testimonials</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ================= MOBILE PHONE PREVIEW & REAL-TIME SYNC CARD ================= -->
+            <div class="card" style="border: 1px solid rgba(212, 163, 89, 0.4); background: linear-gradient(135deg, rgba(212, 163, 89, 0.06), rgba(15, 23, 42, 0.5));">
+                <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h2 class="card-title" style="color: var(--gold-light);">📱 Mobile Phone Real-Time Live Sync</h2>
+                            <span id="mobilePhoneStatusPill" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 11.5px; font-weight: 600; background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; display: inline-block;"></span> 📱 Ready — Open on your phone
+                            </span>
+                        </div>
+                        <p class="card-description" style="margin-top: 4px;">Open this website link on your phone (connected to same Wi-Fi or Hotspot). Whatever you save in this Admin Panel will update on your phone in real-time!</p>
+                    </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-sm); padding: 16px; margin-top: 10px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+                        <div style="flex: 1; min-width: 260px;">
+                            <label style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--gold); font-weight: 700; display: block; margin-bottom: 6px;">
+                                🔗 Mobile Phone Browser Link (Wi-Fi / Hotspot):
+                            </label>
+                            <input type="text" class="mobile-preview-url form-control" value="http://192.168.59.239:3000" readonly style="font-family: monospace; font-size: 14px; font-weight: 600; color: #38bdf8; background: rgba(0,0,0,0.5); cursor: pointer;" onclick="this.select();">
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: flex-end; margin-top: 4px;">
+                            <button type="button" class="btn btn-primary" id="btnCopyPhoneUrl" style="padding: 10px 18px; font-size: 13px;">
+                                📋 Copy Link
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btnPingPhoneTest" style="padding: 10px 18px; font-size: 13px;">
+                                📲 Test Phone Sync
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255,255,255,0.1); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 12.5px; color: var(--text-secondary);">
+                        <div style="display: flex; gap: 8px;">
+                            <span style="color: var(--gold); font-weight: 700;">Step 1:</span>
+                            <span>Phone ko computer ke <strong>same Wi-Fi / Mobile Hotspot</strong> se connect rakhein.</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <span style="color: var(--gold); font-weight: 700;">Step 2:</span>
+                            <span>Phone ke Chrome browser me upar diya link kholein: <strong style="color:#38bdf8;" class="mobile-preview-url">http://192.168.59.239:3000</strong></span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <span style="color: var(--gold); font-weight: 700;">Step 3:</span>
+                            <span>Admin panel me photo ya text change karke <strong>Save</strong> karein — phone par turant change ho jayega!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Studio Info Overview -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">📍 Studio Live Status & Storage Architecture</h2>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.7;">
+                    Your studio website runs with an authoritative 4-tier storage engine. Whenever you save in this admin panel, changes are committed permanently to your laptop disk file (<code>data_store.json</code>) and broadcast to all connected phones in real-time.
+                </p>
+            </div>
+
+        </section>
+
+
+        <!-- ================= 2. TAB: HERO SECTION (CAROUSEL BANNERS) ================= -->
+        <section class="tab-pane" id="tab-hero">
+
+            <div class="card">
+                <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 class="card-title">👑 Hero Background Banners & Slider</h2>
+                        <p class="card-description">Upload multiple background banners that rotate automatically across the top of your homepage hero section.</p>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <label class="btn btn-secondary" style="margin: 0; cursor: pointer;">
+                            📸 Upload Multiple Backgrounds
+                            <input type="file" id="batchBannerFileInput" accept="image/*" multiple style="display: none;">
+                        </label>
+                        <button class="btn btn-primary" id="openAddBannerModalBtn">
+                            ✦ + Add Single Banner Slide
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px; padding: 12px 18px; background: rgba(212, 175, 55, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(212, 175, 55, 0.25); display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 20px;">💡</span>
+                    <span style="font-size: 13px; color: var(--gold-light);">
+                        You can add multiple hero backgrounds using <strong>"Upload Multiple Backgrounds"</strong> or <strong>"+ Add Single Banner Slide"</strong>. The two action buttons (<strong>"✦ Reserve Your Date"</strong> & <strong>"Explore Gallery ▾"</strong>) are positioned on the bottom right.
+                    </span>
+                </div>
+
+                <!-- Banner Slides Grid -->
+                <div class="admin-banners-grid" id="adminBannersGrid">
+                    <!-- Populated dynamically by admin.js -->
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- ================= 3. TAB: GALLERY & PORTFOLIO ================= -->
+        <section class="tab-pane" id="tab-gallery">
+
+            <div class="card">
+                <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 class="card-title">🎨 Mehndi Design Gallery</h2>
+                        <p class="card-description">Add new mehndi photos, assign categories, and organize your online portfolio.</p>
+                    </div>
+
+                    <button class="btn btn-primary" id="openAddGalleryModalBtn">
+                        ✦ + Add New Mehndi Photo
+                    </button>
+                </div>
+
+                <!-- Admin Category Filter Tabs -->
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <button class="btn btn-secondary btn-sm admin-gallery-filter active" data-category="all">All Designs</button>
+                    <button class="btn btn-secondary btn-sm admin-gallery-filter" data-category="bridal">Bridal</button>
+                    <button class="btn btn-secondary btn-sm admin-gallery-filter" data-category="arabic">Arabic</button>
+                    <button class="btn btn-secondary btn-sm admin-gallery-filter" data-category="rajasthani">Rajasthani</button>
+                    <button class="btn btn-secondary btn-sm admin-gallery-filter" data-category="engagement">Engagement</button>
+                    <button class="btn btn-secondary btn-sm admin-gallery-filter" data-category="festival">Festivals</button>
+                </div>
+
+                <!-- Gallery Cards Grid -->
+                <div class="admin-gallery-grid" id="adminGalleryGrid">
+                    <!-- Populated dynamically by admin.js -->
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- ================= 4. TAB: ABOUT ARTIST ================= -->
+        <section class="tab-pane" id="tab-about">
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">👤 Artist Portrait Photo</h2>
+                        <p class="card-description">The photo shown in the "Meet The Artist" section.</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Current Artist Photo</label>
+                        <div class="image-preview-box">
+                            <img id="aboutImagePreview" src="" alt="About Artist Preview">
+                            <span class="preview-badge">Artist Profile</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Upload New Photo From Device <span>(Auto-compressed)</span></label>
+                        <div class="upload-dropzone">
+                            <input type="file" id="aboutFileInput" accept="image/*">
+                            <div class="dropzone-icon">📷</div>
+                            <div class="dropzone-text">Click or Drag & Drop photo here</div>
+                            <div class="dropzone-sub">Upload portrait of Bhuvi</div>
+                        </div>
+
+                        <div style="margin-top: 16px;">
+                            <label class="form-label">Or Enter Direct Image URL</label>
+                            <input type="url" id="aboutImageInput" class="form-control" placeholder="https://images.unsplash.com/...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">📖 Artist Bio & Credentials</h2>
+                        <p class="card-description">Your experience badge, artist headline, and storytelling paragraphs.</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Experience Badge Number</label>
+                        <input type="text" id="aboutExpYearsInput" class="form-control" placeholder="8+">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Experience Badge Label</label>
+                        <input type="text" id="aboutExpLabelInput" class="form-control" placeholder="Years of Bridal Henna Artistry">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Section Heading</label>
+                        <input type="text" id="aboutHeadingInput" class="form-control" placeholder="Where Mewari Tradition Meets Fine Bridal Couture.">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Story Paragraph 1 (Supports HTML formatting)</label>
+                        <textarea id="aboutBio1Input" class="form-control" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Story Paragraph 2</label>
+                        <textarea id="aboutBio2Input" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button class="btn btn-primary" id="saveAboutBtn" style="padding: 12px 28px; font-size: 15px;">
+                    💾 Save Artist Profile Changes
+                </button>
+            </div>
+
+        </section>
+
+
+        <!-- ================= TAB: BRIDE REVIEWS ================= -->
+        <section class="tab-pane" id="tab-reviews">
+
+            <div class="card">
+                <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 class="card-title">⭐ Bride Reviews & Testimonials</h2>
+                        <p class="card-description">Add new bride reviews, edit feedback, and feature heartfelt testimonials on your website.</p>
+                    </div>
+
+                    <button class="btn btn-primary" id="openAddReviewModalBtn">
+                        ✦ + Add New Review
+                    </button>
+                </div>
+
+                <div class="admin-gallery-grid" id="adminReviewsGrid">
+                    <!-- Populated dynamically by admin.js -->
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- ================= TAB: INQUIRIES CRM ================= -->
+        <section class="tab-pane" id="tab-inquiries">
+
+            <div class="card">
+                <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <h2 class="card-title">💌 Customer Booking Requests & Leads</h2>
+                        <p class="card-description">Whenever clients submit the booking form on your website, inquiries appear here with 1-click WhatsApp messaging.</p>
+                    </div>
+
+                    <button class="btn btn-secondary btn-sm" id="clearAllInquiriesBtn">
+                        🗑️ Clear History
+                    </button>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="crm-table">
+                        <thead>
+                            <tr>
+                                <th>Client Name & Date</th>
+                                <th>Phone & WhatsApp</th>
+                                <th>Event Type</th>
+                                <th>Venue & Guests</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inquiriesTableBody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="inquiriesEmptyState" style="display: none; text-align: center; padding: 48px 20px;">
+                    <div style="font-size: 40px; margin-bottom: 12px;">📬</div>
+                    <h3 style="color: var(--text-primary); font-size: 18px; margin-bottom: 6px;">No Inquiries Received Yet</h3>
+                    <p style="color: var(--text-secondary); font-size: 13px; max-width: 480px; margin: 0 auto;">
+                        When visitors fill out the booking concierge on your website, their contact details, dates, and requests will automatically be saved and displayed here.
+                    </p>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- ================= 7. TAB: STUDIO SETTINGS ================= -->
+        <section class="tab-pane" id="tab-settings">
+
+            <!-- Contact & WhatsApp Details -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">📞 Studio Contact & WhatsApp Number</h2>
+                        <p class="card-description">Changes here will automatically update the booking submission receiver and contact buttons.</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">WhatsApp Number <span>(Include country code without + e.g. 918320904682)</span></label>
+                        <input type="text" id="settingsWaInput" class="form-control" value="918320904682">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Direct Calling Phone</label>
+                        <input type="text" id="settingsPhoneInput" class="form-control" value="+91 83209 04682">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Studio Email Address</label>
+                        <input type="email" id="settingsEmailInput" class="form-control" value="prajapatbhavna2003@gmail.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Instagram Handle <span>(without @)</span></label>
+                        <input type="text" id="settingsInstagramInput" class="form-control" value="bhuvi_mehandi_24">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Studio Physical Location / Address</label>
+                        <input type="text" id="settingsAddressInput" class="form-control" value="Near Mohanlal Sukhadia University, Udaipur, Rajasthan 313001">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                    <button class="btn btn-primary" id="saveSettingsBtn">
+                        💾 Save Contact Settings
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Security Credentials -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">🔒 Change Admin Username & Password</h2>
+                        <p class="card-description">Update your studio login credentials used to unlock this control panel.</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Admin Username</label>
+                        <input type="text" id="settingsAdminUserInput" class="form-control" placeholder="admin" value="admin">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Current Password</label>
+                        <input type="password" id="currentPasswordInput" class="form-control" placeholder="Enter current password">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">New Password</label>
+                        <input type="password" id="newPasswordInput" class="form-control" placeholder="Enter new password (at least 4 characters)">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+                    <button class="btn btn-secondary" id="changeCredentialsBtn">
+                        🔑 Update Login Credentials
+                    </button>
+                </div>
+            </div>
+
+            <!-- Backup & Restore -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">💾 Backup, Restore & Reset</h2>
+                        <p class="card-description">Download a complete copy of all your custom gallery photos, text, and inquiries to keep as safe backup.</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+                    <button class="btn btn-secondary" id="exportBackupBtn">
+                        📥 Download Backup (JSON)
+                    </button>
+
+                    <label class="btn btn-secondary" style="margin: 0; cursor: pointer;">
+                        📤 Restore from Backup File
+                        <input type="file" id="importBackupFile" accept=".json" style="display: none;">
+                    </label>
+
+                    <button class="btn btn-danger" id="resetFactoryBtn" style="margin-left: auto;">
+                        ⚠️ Reset to Factory Defaults
+                    </button>
+                </div>
+            </div>
+
+        </section>
+
+
+        <!-- ================= 8. TAB: CLOUD DATABASE & PUBLISHING SYNC ================= -->
+        <section class="tab-pane" id="tab-database">
+
+            <!-- Live Cloud Connection Card -->
+            <div class="card" style="border: 1px solid rgba(212, 175, 55, 0.3);">
+                <div class="card-header" style="align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h2 class="card-title" style="margin: 0;">☁️ Cloud Database & Publishing Sync</h2>
+                            <span id="cloudStatusPill" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
+                                <span style="width: 8px; height: 8px; border-radius: 50%; background: #eab308; display: inline-block;"></span>
+                                Local Storage Mode (Offline)
+                            </span>
+                        </div>
+                        <p class="card-description" style="margin-top: 6px;">
+                            Connect Google Firebase Firestore so that when you publish your website, <strong>no data is ever lost</strong>. Client inquiries from around the world are instantly received on your devices, and your gallery changes sync globally in real-time.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-secondary btn-sm" id="testCloudBtn">
+                            🔍 Test Cloud Connection
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Cloud Summary Alert / Banner -->
+                <div id="cloudAlertBox" style="background: rgba(234, 179, 8, 0.08); border-left: 4px solid #eab308; padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 20px;">
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="font-size: 20px;">💡</span>
+                        <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
+                            <strong style="color: var(--text-primary);" id="cloudAlertTitle">Currently Operating in High-Speed Local Mode:</strong>
+                            <div id="cloudAlertDesc">Your photos, settings, and inquiries are currently saved in your computer's browser storage. To make inquiries and updates accessible across multiple phones and computers once published on the web (e.g. GitHub Pages, Netlify, or Vercel), enter your free Firebase credentials below.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sync Action Buttons -->
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; background: rgba(0,0,0,0.25); border-radius: var(--radius-sm); margin-bottom: 24px;">
+                    <button class="btn btn-primary" id="btnSyncLocalToCloud">
+                        ☁️ Upload Local Data to Cloud
+                    </button>
+                    <button class="btn btn-secondary" id="btnPullCloudToLocal">
+                        📥 Pull Live Cloud Data to Local
+                    </button>
+                    <button class="btn btn-secondary" id="btnFlushOfflineQueue" style="margin-left: auto;">
+                        🔄 Flush Offline Queue
+                    </button>
+                </div>
+
+                <!-- Triple-Layer Storage Status -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">1. Cloud Firestore</span>
+                            <span id="statusCloudTier" style="font-size: 11px; color: #eab308; font-weight: 600;">Standby / Local</span>
+                        </div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">Google Firebase</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Global Multi-Device Sync</div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">2. IndexedDB</span>
+                            <span style="font-size: 11px; color: var(--success); font-weight: 600;">🟢 Active (Disk)</span>
+                        </div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">High-Capacity Local</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Large photos & offline store</div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">3. LocalStorage</span>
+                            <span style="font-size: 11px; color: var(--success); font-weight: 600;">🟢 Active (Memory)</span>
+                        </div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">Synchronous Fast-Path</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Instant zero-lag UI render</div>
+                    </div>
+
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">4. Server Database</span>
+                            <span id="statusServerTier" style="font-size: 11px; color: #eab308; font-weight: 600;">Checking...</span>
+                        </div>
+                        <div style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">Node.js Server Disk</div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">data_store.json (Multi-Device)</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Firebase Configuration Credentials Form -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">🔑 Google Firebase Cloud Credentials</h2>
+                        <p class="card-description">Paste your free Firebase project settings here. This allows client bookings to reach you and ensures your gallery updates are visible to visitors worldwide.</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">Firebase API Key *</label>
+                        <input type="text" id="fbApiKeyInput" class="form-control" placeholder="AIzaSy...">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Firebase Project ID *</label>
+                        <input type="text" id="fbProjectIdInput" class="form-control" placeholder="bhuvi-mehandi-studio">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Auth Domain</label>
+                        <input type="text" id="fbAuthDomainInput" class="form-control" placeholder="bhuvi-mehandi-studio.firebaseapp.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Storage Bucket</label>
+                        <input type="text" id="fbStorageBucketInput" class="form-control" placeholder="bhuvi-mehandi-studio.appspot.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Messaging Sender ID</label>
+                        <input type="text" id="fbMessagingSenderIdInput" class="form-control" placeholder="1234567890">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">App ID</label>
+                        <input type="text" id="fbAppIdInput" class="form-control" placeholder="1:1234567890:web:abcdef...">
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; margin-top: 16px;">
+                    <button class="btn btn-secondary" id="btnClearFbConfig">
+                        Disconnect / Clear Credentials
+                    </button>
+                    <button class="btn btn-primary" id="btnSaveFbConfig">
+                        💾 Save & Connect Cloud Database
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick 2-Minute Setup Instructions -->
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <h2 class="card-title">📖 2-Minute Guide: Getting Free Cloud Database Credentials</h2>
+                        <p class="card-description">Google Firebase provides a 100% free forever tier (50,000 reads/day, 20,000 writes/day, zero credit card needed).</p>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13.5px; color: var(--text-secondary); line-height: 1.6;">
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <span style="background: var(--gold); color: #000; font-weight: 800; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px;">1</span>
+                        <div>
+                            <strong style="color: var(--text-primary);">Create Free Project:</strong> Go to <a href="https://console.firebase.google.com" target="_blank" style="color: var(--gold); text-decoration: underline;">console.firebase.google.com</a>, log in with Google, and click <strong>"Add project"</strong> (name it e.g. <code>bhuvi-mehandi</code>).
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <span style="background: var(--gold); color: #000; font-weight: 800; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px;">2</span>
+                        <div>
+                            <strong style="color: var(--text-primary);">Enable Firestore Database:</strong> Click <strong>"Firestore Database"</strong> in the left menu &rarr; Click <strong>"Create database"</strong> &rarr; Select <strong>"Start in test mode"</strong> (or paste the security rules below) &rarr; Choose your closest region (e.g. <code>asia-south1</code> for Mumbai/India).
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; align-items: flex-start;">
+                        <span style="background: var(--gold); color: #000; font-weight: 800; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 13px;">3</span>
+                        <div>
+                            <strong style="color: var(--text-primary);">Copy Config:</strong> Click the Gear icon ⚙️ (Project Settings) &rarr; Scroll down to <strong>"Your apps"</strong> &rarr; Click the <strong>Web (&lt;/&gt;)</strong> icon &rarr; Copy the <code>firebaseConfig</code> values into the fields above and click <strong>"Save & Connect"</strong>!
+                        </div>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; margin-top: 6px;">
+                        <div style="font-size: 12px; font-weight: 700; color: var(--gold); margin-bottom: 6px;">🔒 Recommended Firestore Security Rules:</div>
+                        <pre style="margin: 0; font-family: monospace; font-size: 12px; color: #a5b4fc; overflow-x: auto;">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </div>
+
+</main>
+
+
+<!-- ================= MODAL: ADD / EDIT BANNER SLIDE ================= -->
+<div class="modal-overlay" id="bannerModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 class="modal-title" id="bannerModalTitle">✦ Add Hero Banner Slide</h3>
+            <button class="modal-close" id="closeBannerModal">&times;</button>
+        </div>
+
+        <input type="hidden" id="bannerEditId" value="">
+
+        <div class="form-group">
+            <label class="form-label">Banner Slide Title / Description</label>
+            <input type="text" id="bannerTitleInput" class="form-control" placeholder="e.g. Royal Bridal Collection Panorama Banner">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Upload Banner Image From Device <span>(Auto-compressed)</span></label>
+            <div class="upload-dropzone">
+                <input type="file" id="bannerFileInput" accept="image/*" multiple>
+                <div class="dropzone-icon">🖼️</div>
+                <div class="dropzone-text">Click to browse or drop one or multiple banner images</div>
+                <div class="dropzone-sub">Panorama format recommended (approx. 2048 x 768 or 3:1)</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Or Direct Banner Image URL / Path</label>
+            <input type="text" id="bannerUrlInput" class="form-control" placeholder="hero-banner.png or https://...">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Banner Image Preview</label>
+            <div class="image-preview-box" style="height: 150px; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; padding: 6px;">
+                <img id="bannerPreview" src="" alt="Banner Preview" style="width: 100%; height: auto; max-height: 140px; object-fit: contain;">
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-secondary" id="cancelBannerModalBtn">
+                Cancel
+            </button>
+            <button class="btn btn-primary" id="saveBannerItemBtn">
+                ✦ Save Banner Slide
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ================= MODAL: ADD / EDIT GALLERY ITEM ================= -->
+<div class="modal-overlay" id="galleryModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 class="modal-title" id="galleryModalTitle">✦ Add New Mehndi Photo</h3>
+            <button class="modal-close" id="closeGalleryModal">&times;</button>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Upload Photo From Computer / Phone <span>(Auto-compressed)</span></label>
+            <div class="upload-dropzone">
+                <input type="file" id="galFileInput" accept="image/*">
+                <div class="dropzone-icon">📷</div>
+                <div class="dropzone-text">Click to browse or drop mehndi photo</div>
+                <div class="dropzone-sub">Supports camera photos, PNG, JPG, WebP</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Or Image URL</label>
+            <input type="url" id="galImageInput" class="form-control" placeholder="https://...">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Photo Live Preview</label>
+            <div class="image-preview-box" style="height: 180px;">
+                <img id="galPreview" src="" alt="Preview">
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">Design Title</label>
+                <input type="text" id="galTitleInput" class="form-control" placeholder="e.g. Royal Bridal Full-Arm Peacock">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Category</label>
+                <select id="galCategorySelect" class="form-control">
+                    <option value="bridal">Bridal</option>
+                    <option value="arabic">Arabic</option>
+                    <option value="rajasthani">Rajasthani</option>
+                    <option value="engagement">Engagement</option>
+                    <option value="festival">Festivals & Celebrations</option>
+                    <option value="contemporary">Contemporary / Modern</option>
+                    <option value="minimalist">Minimalist</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Style Tag / Subtitle</label>
+                <input type="text" id="galSubtitleInput" class="form-control" placeholder="e.g. Heritage Marwari">
+            </div>
+
+            <div class="form-group" style="justify-content: center;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; color: var(--text-primary); margin-top: 22px;">
+                    <input type="checkbox" id="galLargeCheck" style="width: 18px; height: 18px; accent-color: var(--gold);">
+                    <span>Featured Large Card in Grid</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="document.getElementById('galleryModal').classList.remove('active')">
+                Cancel
+            </button>
+            <button class="btn btn-primary" id="saveGalleryItemBtn">
+                ✦ Save Mehndi Design
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ================= MODAL: ADD / EDIT REVIEW ================= -->
+<div class="modal-overlay" id="reviewModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 class="modal-title" id="reviewModalTitle">✦ Add Bride Review</h3>
+            <button class="modal-close" id="closeReviewModal">&times;</button>
+        </div>
+
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">Bride / Client Name *</label>
+                <input type="text" id="revNameInput" class="form-control" placeholder="e.g. Pooja Rathore">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Event / Location / Role *</label>
+                <input type="text" id="revRoleInput" class="form-control" placeholder="e.g. Destination Bride • Jagmandir Palace, Udaipur">
+            </div>
+
+            <div class="form-group full-width">
+                <label class="form-label">Star Rating</label>
+                <select id="revStarsSelect" class="form-control">
+                    <option value="5">★★★★★ (5 Stars - Exceptional)</option>
+                    <option value="4">★★★★☆ (4 Stars - Wonderful)</option>
+                    <option value="3">★★★☆☆ (3 Stars - Good)</option>
+                </select>
+            </div>
+
+            <div class="form-group full-width">
+                <label class="form-label">Review / Testimonial Text *</label>
+                <textarea id="revTextInput" class="form-control" rows="4" placeholder="Enter what the bride shared about your bridal mehndi design and service..."></textarea>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="document.getElementById('reviewModal').classList.remove('active')">
+                Cancel
+            </button>
+            <button class="btn btn-primary" id="saveReviewBtn">
+                ✦ Save Review
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Firebase Cloud Database SDK (Compat for zero build step) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<!-- Bhuvi Cloud & Permanent Storage Engine -->
+<script src="db-sync.js"></script>
+
+<!-- Admin JavaScript -->
+<script src="admin.js"></script>
+
+</body>
+</html>

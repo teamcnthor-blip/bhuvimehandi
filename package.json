@@ -1,0 +1,25 @@
+{
+  "name": "bhuvi-mehandi-luxury-studio",
+  "version": "1.0.0",
+  "description": "Bhuvi Mehandi Luxury Henna Studio Website & CMS with Zero-Data-Loss Cloud Database",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "node -e \"console.log('Build completed for Vercel deployment')\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mehndi",
+    "henna",
+    "bridal",
+    "cms",
+    "firebase",
+    "firestore",
+    "vercel"
+  ],
+  "author": "Bhuvi Prajapat",
+  "license": "ISC"
+}

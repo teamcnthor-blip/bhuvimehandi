@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Vercel
+.vercel/
+
+# Editor directories
+.vscode/
+.idea/
+
+# Logs & Temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+*.tmp_*
+
+# OS metadata
+.DS_Store
+Thumbs.db
+ehthumbs.db
