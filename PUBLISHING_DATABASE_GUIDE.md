@@ -111,8 +111,8 @@ If you prefer running a Node.js server on your own computer or VPS (Render, Rail
    npm start
    ```
 3. Open your browser to:
-   - **Website**: `http://localhost:3000`
-   - **Admin Portal**: `http://localhost:3000/admin.html`
+   - **Website**: `http://localhost:5502`
+   - **Admin Portal**: `http://localhost:5502/admin.html`
 4. The server automatically stores all inquiries and content permanently in:
    - `data_store.json`
    - `inquiries_store.json`

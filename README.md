@@ -7,7 +7,7 @@ A luxury bridal and designer mehndi artist website and interactive studio CMS bu
 ## 🌟 Key Features
 
 - **Luxury Royal Rajasthani Aesthetic**: Rich crimson, royal gold accents, elegant typography (Playfair Display, Cormorant Garamond, Plus Jakarta Sans), and smooth animations.
-- **Dynamic Studio CMS & Gallery**: Manage bridal collections, Arabic designs, rate cards, and services directly from the integrated Admin Portal (`/admin`).
+- **Dynamic Studio CMS & Gallery**: Manage bridal collections, Arebic designs, rate cards, and services directly from the integrated Admin Portal (`/admin`).
 - **Interactive Booking System**: Online appointment scheduling and bridal consultation forms with real-time status management.
 - **4-Tier Zero-Data-Loss Architecture**:
   1. *Serverless Vercel API* (`/api/data`, `/api/inquiries`, `/api/config`)
@@ -90,5 +90,5 @@ To run the full standalone Node.js server on your local machine:
 ```bash
 npm start
 ```
-- Website: `http://localhost:3000`
-- Admin: `http://localhost:3000/admin.html`
+- Website: `http://localhost:5502`
+- Admin: `http://localhost:5502/admin.html`

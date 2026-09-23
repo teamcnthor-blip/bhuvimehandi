@@ -52,7 +52,7 @@
                 alt: "Intricate royal bridal mehndi design",
                 title: "Royal Bridal Full-Arm Mehndi",
                 category: "bridal",
-                categoryLabel: "Bridal Collection",
+                categoryLabel: "Bride & Groom",
                 subtitle: "Royal Bridal Henna",
                 isLarge: true
             },
@@ -62,7 +62,7 @@
                 alt: "Arabic floral mehndi design",
                 title: "Modern Arabic Floral Trail",
                 category: "arabic",
-                categoryLabel: "Arabic Style",
+                categoryLabel: "Arabic",
                 subtitle: "Floral Trail",
                 isLarge: false
             },
@@ -72,7 +72,7 @@
                 alt: "Traditional Rajasthani Marwari wedding mehndi",
                 title: "Heritage Marwari Bharwa Mehndi",
                 category: "rajasthani",
-                categoryLabel: "Rajasthani",
+                categoryLabel: "Rajasthani/Bharwa",
                 subtitle: "Heritage Marwari",
                 isLarge: false
             },
@@ -102,7 +102,7 @@
                 alt: "Intricate bridal palm and wrist mehndi",
                 title: "Intricate Bridal Palms & Cuffs",
                 category: "bridal",
-                categoryLabel: "Bridal Collection",
+                categoryLabel: "Bride & Groom",
                 subtitle: "Palms & Cuffs",
                 isLarge: false
             },
@@ -112,7 +112,7 @@
                 alt: "Contemporary designer Arabic mehndi",
                 title: "Contemporary Negative-Space Arabic",
                 category: "arabic",
-                categoryLabel: "Arabic Designer",
+                categoryLabel: "Arabic",
                 subtitle: "Negative Space",
                 isLarge: false
             },
@@ -122,8 +122,18 @@
                 alt: "Traditional Rajasthani peacock henna art",
                 title: "Traditional Jharokha & Peacock Art",
                 category: "rajasthani",
-                categoryLabel: "Rajasthani Heritage",
+                categoryLabel: "Rajasthani/Bharwa",
                 subtitle: "Jharokha & Peacock",
+                isLarge: false
+            },
+            {
+                id: "gal-9",
+                src: "https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=700&q=80",
+                alt: "Luxury designer mehndi art with intricate cuffs",
+                title: "Luxury Royal Designer Mandala & Grid",
+                category: "designer",
+                categoryLabel: "Designer",
+                subtitle: "Mandala & Grid Fusion",
                 isLarge: false
             }
         ],
@@ -183,6 +193,8 @@
     /* ================= STATE ================= */
     let appData = null;
     let inquiries = [];
+    let loadStateInFlight = false;
+    let cloudUiIntervalId = null;
 
     function broadcastUpdate() {
         try {
@@ -201,10 +213,14 @@
     // Load state safely: Server API -> Cloud Firestore -> IndexedDB -> LocalStorage
     // NEVER prematurely overwrites existing data with DEFAULT_DATA on startup!
     async function loadState() {
-        let loaded = null;
+        if (loadStateInFlight) return;
+        loadStateInFlight = true;
 
-        // 1. Fast initial synchronous read from localStorage for instant render
         try {
+            let loaded = null;
+
+            // 1. Fast initial synchronous read from localStorage for instant render
+            try {
             const raw = localStorage.getItem(DATA_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
@@ -285,27 +301,30 @@
             }
         }
 
-        // Render UI with full data
-        renderAdminBanners();
-        renderAdminGallery();
-        renderAdminReviews();
-        renderInquiriesTable();
-        updateOverviewStats();
+            // Render UI with full data
+            renderAdminBanners();
+            renderAdminGallery();
+            renderAdminReviews();
+            renderInquiriesTable();
+            updateOverviewStats();
 
-        // 6. Listen for Real-Time Client Inquiries from live website or other devices
-        if (window.BhuviDB && typeof window.BhuviDB.listenToInquiries === "function") {
-            window.BhuviDB.listenToInquiries((liveInqs) => {
-                if (Array.isArray(liveInqs)) {
-                    const previousCount = inquiries.length;
-                    inquiries = liveInqs;
-                    if (liveInqs.length > previousCount && previousCount > 0) {
-                        const latest = liveInqs[0];
-                        showToast(`🔔 New Booking Inquiry received from ${latest.name || "a bride"}!`, "success");
+            // 6. Listen for Real-Time Client Inquiries from live website or other devices
+            if (window.BhuviDB && typeof window.BhuviDB.listenToInquiries === "function") {
+                window.BhuviDB.listenToInquiries((liveInqs) => {
+                    if (Array.isArray(liveInqs)) {
+                        const previousCount = inquiries.length;
+                        inquiries = liveInqs;
+                        if (liveInqs.length > previousCount && previousCount > 0) {
+                            const latest = liveInqs[0];
+                            showToast(`🔔 New Booking Inquiry received from ${latest.name || "a bride"}!`, "success");
+                        }
+                        renderInquiriesTable();
+                        updateOverviewStats();
                     }
-                    renderInquiriesTable();
-                    updateOverviewStats();
-                }
-            });
+                });
+            }
+        } finally {
+            loadStateInFlight = false;
         }
     }
 
@@ -428,6 +447,16 @@
     }
 
     /* ================= AUTHENTICATION ================= */
+    function isAdminSessionActive() {
+        return sessionStorage.getItem("bhuvi_admin_auth") === "true";
+    }
+
+    function requireAdminSession() {
+        if (isAdminSessionActive()) return true;
+        showToast("Please log in as admin before deleting records.", "error");
+        return false;
+    }
+
     function initAuth() {
         const lockOverlay = document.getElementById("lockOverlay");
         const usernameInput = document.getElementById("adminUsernameInput");
@@ -443,9 +472,9 @@
         function handleLogin() {
             const user = (usernameInput ? usernameInput.value.trim() : "").toLowerCase();
             const pass = passwordInput ? passwordInput.value.trim() : "";
-
-            const validUser = (appData.settings.adminUsername || "admin").toLowerCase();
-            const validPass = appData.settings.adminPassword || appData.settings.adminPin || "admin123";
+            const settings = (appData && appData.settings) || DEFAULT_DATA.settings;
+            const validUser = ((settings && settings.adminUsername) || "admin").toLowerCase();
+            const validPass = (settings && (settings.adminPassword || settings.adminPin)) || "admin123";
 
             // Allow flexible access:
             // 1. Correct configured username + password
@@ -548,6 +577,10 @@
 
     /* ================= OVERVIEW STATS ================= */
     function updateOverviewStats() {
+        if (!appData) {
+            appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        }
+
         const statGalleryCount = document.getElementById("statGalleryCount");
         const statInquiriesCount = document.getElementById("statInquiriesCount");
         const statCategoriesCount = document.getElementById("statCategoriesCount");
@@ -578,6 +611,10 @@
     function renderAdminBanners() {
         const grid = document.getElementById("adminBannersGrid");
         if (!grid) return;
+
+        if (!appData) {
+            appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        }
 
         const list = appData.heroBanners || [];
 
@@ -822,14 +859,84 @@
     let galleryFilterCurrent = "all";
     let editingGalleryId = null;
 
+    async function ensureGalleryData() {
+        if (!appData) {
+            appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        }
+        if (!Array.isArray(appData.gallery)) {
+            appData.gallery = [];
+        }
+        return appData;
+    }
+
+    async function addGalleryItem(item) {
+        await ensureGalleryData();
+        const normalized = {
+            id: item.id || "gal-" + Date.now(),
+            src: item.src || "",
+            title: item.title || "Untitled Design",
+            alt: item.alt || item.title || "Mehndi Design",
+            category: item.category || "bridal",
+            categoryLabel: item.categoryLabel || (item.category || "bridal").toUpperCase(),
+            subtitle: item.subtitle || "",
+            isLarge: !!item.isLarge
+        };
+
+        appData.gallery.unshift(normalized);
+        renderAdminGallery();
+        await saveState();
+        return normalized;
+    }
+
+    async function removeGalleryItem(id) {
+        await ensureGalleryData();
+        const before = appData.gallery.length;
+        appData.gallery = appData.gallery.filter(g => g.id !== id);
+
+        if (appData.gallery.length === before) {
+            return false;
+        }
+
+        renderAdminGallery();
+        await saveState();
+        return true;
+    }
+
+    function syncGalleryFilterButtons() {
+        const filterBtns = document.querySelectorAll(".admin-gallery-filter");
+        if (!filterBtns.length) return;
+        filterBtns.forEach(btn => {
+            const value = btn.dataset.category || "all";
+            btn.classList.toggle("active", value === galleryFilterCurrent);
+        });
+    }
+
     function renderAdminGallery() {
         const grid = document.getElementById("adminGalleryGrid");
         if (!grid) return;
 
-        const list = appData.gallery || [];
+        if (!appData) {
+            appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        }
+
+        const list = Array.isArray(appData.gallery) ? appData.gallery : [];
+
+        function normalizeAdminCat(cat) {
+            const c = (cat || "bridal").toLowerCase().trim();
+            if (c === "bride & groom" || c === "bride_groom" || c === "bridal collection" || c === "bridal") return "bridal";
+            if (c === "rajasthani/bharwa" || c === "rajasthani_bharwa" || c === "rajasthani heritage" || c === "rajasthani" || c === "bharwa rajasthani") return "rajasthani";
+            if (c === "arabic" || c === "arabic style" || c === "arabic designer" || c === "arabic mehndi") return "arabic";
+            if (c === "designer" || c === "designer mehndi" || c === "royal designer" || c === "contemporary designer") return "designer";
+            if (c === "engagement" || c === "engagement & roka" || c === "roka") return "engagement";
+            if (c === "festival" || c === "festivals" || c === "festive") return "festival";
+            return c;
+        }
+
         const filtered = galleryFilterCurrent === "all"
             ? list
-            : list.filter(item => (item.category || "").toLowerCase() === galleryFilterCurrent);
+            : list.filter(item => normalizeAdminCat(item.category) === galleryFilterCurrent);
+
+        syncGalleryFilterButtons();
 
         if (filtered.length === 0) {
             grid.innerHTML = `
@@ -841,9 +948,23 @@
             return;
         }
 
+        // Admin badge label normalization (backward-compatible with old labels)
+        function getAdminBadgeLabel(item) {
+            const cat = (item.category || "bridal").toLowerCase();
+            // Prefer stored categoryLabel but normalize legacy values
+            const stored = (item.categoryLabel || item.category_label || "").trim();
+            const storedLower = stored.toLowerCase();
+            if (storedLower === "bridal collection" || storedLower === "bridal") return "Bride & Groom";
+            if (storedLower === "rajasthani heritage" || storedLower === "rajasthani") return "Rajasthani/Bharwa";
+            if (storedLower === "arabic style" || storedLower === "arabic designer") return "Arabic";
+            if (stored) return stored;
+            const catLabelMap = { bridal: "Bride & Groom", arabic: "Arabic", rajasthani: "Rajasthani/Bharwa", designer: "Designer", engagement: "Engagement", festival: "Festivals" };
+            return catLabelMap[cat] || cat.toUpperCase();
+        }
+
         grid.innerHTML = filtered.map(item => {
             const cat = item.category || "bridal";
-            const badge = item.categoryLabel || cat.toUpperCase();
+            const badge = getAdminBadgeLabel(item);
             return `
                 <div class="admin-gallery-card" data-id="${item.id}">
                     <div class="admin-gallery-thumb">
@@ -915,19 +1036,37 @@
             if (galImageInput) galImageInput.value = item.src || "";
             if (galPreview) galPreview.src = item.src || "";
             if (galTitleInput) galTitleInput.value = item.title || "";
-            if (galCategorySelect) galCategorySelect.value = (item.category || "bridal").toLowerCase();
+            if (galCategorySelect) {
+                const catVal = (item.category || "bridal").toLowerCase();
+                // Ensure the option exists; add a temporary one if custom
+                let optionExists = Array.from(galCategorySelect.options).some(o => o.value === catVal);
+                if (!optionExists) {
+                    const opt = document.createElement("option");
+                    opt.value = catVal;
+                    opt.textContent = catVal.charAt(0).toUpperCase() + catVal.slice(1);
+                    galCategorySelect.appendChild(opt);
+                }
+                galCategorySelect.value = catVal;
+            }
             if (galSubtitleInput) galSubtitleInput.value = item.subtitle || "";
             if (galLargeCheck) galLargeCheck.checked = !!item.isLarge;
             if (modal) modal.classList.add("active");
         };
 
-        window.adminDeleteGallery = function (id) {
+        window.adminDeleteGallery = async function (id) {
+            if (!requireAdminSession()) return;
+            await ensureGalleryData();
             const item = (appData.gallery || []).find(g => g.id === id);
             const title = item ? item.title : "this item";
             if (confirm(`Are you sure you want to remove "${title}" from the gallery?`)) {
-                appData.gallery = (appData.gallery || []).filter(g => g.id !== id);
-                saveState();
-                renderAdminGallery();
+                const removed = await removeGalleryItem(id);
+                if (removed) {
+                    galleryFilterCurrent = "all";
+                    renderAdminGallery();
+                    showToast(`"${title}" removed from gallery.`, "success");
+                } else {
+                    showToast("Gallery item not found or already removed.", "error");
+                }
             }
         };
 
@@ -954,66 +1093,72 @@
         }
 
         if (saveBtn) {
-            saveBtn.addEventListener("click", () => {
-                const src = (galImageInput.value || "").trim();
-                const title = (galTitleInput.value || "").trim();
-                const category = galCategorySelect.value;
-                const subtitle = (galSubtitleInput.value || "").trim() || `${category.charAt(0).toUpperCase() + category.slice(1)} Henna`;
-                const isLarge = galLargeCheck.checked;
+            saveBtn.addEventListener("click", async () => {
+                try {
+                    await ensureGalleryData();
+                    const src = (galImageInput.value || "").trim();
+                    const title = (galTitleInput.value || "").trim();
+                    const category = galCategorySelect.value;
+                    const subtitle = (galSubtitleInput.value || "").trim() || `${category.charAt(0).toUpperCase() + category.slice(1)} Henna`;
+                    const isLarge = galLargeCheck.checked;
 
-                if (!src) {
-                    alert("Please provide an image URL or upload an image file.");
-                    return;
-                }
-                if (!title) {
-                    alert("Please provide a title for this design.");
-                    return;
-                }
+                    if (!src) {
+                        alert("Please provide an image URL or upload an image file.");
+                        return;
+                    }
+                    if (!title) {
+                        alert("Please provide a title for this design.");
+                        return;
+                    }
 
-                const catLabels = {
-                    bridal: "Bridal Collection",
-                    arabic: "Arabic Style",
-                    rajasthani: "Rajasthani Heritage",
-                    engagement: "Engagement",
-                    festival: "Festivals",
-                    minimalist: "Minimalist",
-                    contemporary: "Contemporary"
-                };
+                    const catLabels = {
+                        bridal: "Bride & Groom",
+                        arabic: "Arabic",
+                        rajasthani: "Rajasthani/Bharwa",
+                        designer: "Designer",
+                        engagement: "Engagement",
+                        festival: "Festivals",
+                        minimalist: "Minimalist",
+                        contemporary: "Contemporary"
+                    };
 
-                if (editingGalleryId) {
-                    // Update existing
-                    const idx = appData.gallery.findIndex(g => g.id === editingGalleryId);
-                    if (idx !== -1) {
-                        appData.gallery[idx] = {
-                            ...appData.gallery[idx],
+                    if (editingGalleryId) {
+                        const idx = appData.gallery.findIndex(g => g.id === editingGalleryId);
+                        if (idx !== -1) {
+                            appData.gallery[idx] = {
+                                ...appData.gallery[idx],
+                                src,
+                                title,
+                                category,
+                                categoryLabel: catLabels[category] || category.toUpperCase(),
+                                subtitle,
+                                isLarge
+                            };
+                            showToast("Gallery design updated!", "success");
+                        }
+                    } else {
+                        const newItem = {
+                            id: "gal-" + Date.now(),
                             src,
                             title,
+                            alt: title,
                             category,
                             categoryLabel: catLabels[category] || category.toUpperCase(),
                             subtitle,
                             isLarge
                         };
-                        showToast("Gallery design updated!", "success");
+                        appData.gallery.unshift(newItem);
+                        showToast("New photo added to gallery!", "success");
                     }
-                } else {
-                    // Add new item
-                    const newItem = {
-                        id: "gal-" + Date.now(),
-                        src,
-                        title,
-                        alt: title,
-                        category,
-                        categoryLabel: catLabels[category] || category.toUpperCase(),
-                        subtitle,
-                        isLarge
-                    };
-                    appData.gallery.unshift(newItem);
-                    showToast("New photo added to gallery!", "success");
-                }
 
-                saveState();
-                renderAdminGallery();
-                if (modal) modal.classList.remove("active");
+                    galleryFilterCurrent = "all";
+                    await saveState();
+                    renderAdminGallery();
+                    if (modal) modal.classList.remove("active");
+                } catch (error) {
+                    console.error("Gallery save failed:", error);
+                    showToast("Gallery save failed. Please try again.", "error");
+                }
             });
         }
     }
@@ -1082,6 +1227,10 @@
     function renderAdminReviews() {
         const grid = document.getElementById("adminReviewsGrid");
         if (!grid) return;
+
+        if (!appData) {
+            appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        }
 
         const list = appData.reviews || [];
 
@@ -1156,13 +1305,15 @@
             if (modal) modal.classList.add("active");
         };
 
-        window.adminDeleteReview = function (id) {
+        window.adminDeleteReview = async function (id) {
+            if (!requireAdminSession()) return;
             const item = (appData.reviews || []).find(r => r.id === id);
             const name = item ? item.name : "this review";
             if (confirm(`Are you sure you want to delete review from "${name}"?`)) {
                 appData.reviews = (appData.reviews || []).filter(r => r.id !== id);
-                saveState();
+                await saveState();
                 renderAdminReviews();
+                showToast(`Review from "${name}" deleted.`, "success");
             }
         };
 
@@ -1170,7 +1321,7 @@
         if (modalClose) modalClose.addEventListener("click", () => modal.classList.remove("active"));
 
         if (saveBtn) {
-            saveBtn.addEventListener("click", () => {
+            saveBtn.addEventListener("click", async () => {
                 const name = (revNameInput.value || "").trim();
                 const role = (revRoleInput.value || "").trim();
                 const stars = parseInt(revStarsSelect.value, 10) || 5;
@@ -1212,7 +1363,7 @@
                     showToast("New bride review added!", "success");
                 }
 
-                saveState();
+                await saveState();
                 renderAdminReviews();
                 if (modal) modal.classList.remove("active");
             });
@@ -1439,8 +1590,12 @@
                             inquiries = parsed.inquiries;
                             localStorage.setItem("bhuvi_inquiries", JSON.stringify(inquiries));
                         }
-                        showToast("Backup restored successfully! Reloading...", "success");
-                        setTimeout(() => window.location.reload(), 1200);
+                        showToast("Backup restored successfully! Refreshing admin data...", "success");
+                        setTimeout(() => {
+                            loadState();
+                            renderInquiriesTable();
+                            updateOverviewStats();
+                        }, 500);
                     } catch (err) {
                         showToast("Invalid backup JSON file", "error");
                     }
@@ -1455,8 +1610,12 @@
                 if (confirm("⚠️ WARNING: This will reset all photos, headlines, and settings back to original factory defaults. Are you sure?")) {
                     appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
                     localStorage.setItem("bhuvi_mehndi_data", JSON.stringify(appData));
-                    showToast("Factory defaults restored! Reloading...", "success");
-                    setTimeout(() => window.location.reload(), 1000);
+                    showToast("Factory defaults restored! Refreshing content...", "success");
+                    setTimeout(() => {
+                        loadState();
+                        renderInquiriesTable();
+                        updateOverviewStats();
+                    }, 500);
                 }
             });
         }
@@ -1644,7 +1803,7 @@
                         }
 
                         const bestIp = (json.ips && json.ips[0]) || "192.168.59.239";
-                        const fullPhoneUrl = `http://${bestIp}:${json.port || 3000}`;
+                        const fullPhoneUrl = `http://${bestIp}:${json.port || 5502}`;
                         document.querySelectorAll(".mobile-preview-url").forEach(el => {
                             if (el.tagName === "INPUT") el.value = fullPhoneUrl;
                             else el.textContent = fullPhoneUrl;
@@ -1698,7 +1857,7 @@
         if (btnCopyPhoneUrl) {
             btnCopyPhoneUrl.addEventListener("click", () => {
                 const input = document.querySelector(".mobile-preview-url");
-                const url = input ? (input.value || input.textContent) : "http://192.168.59.239:3000";
+                const url = input ? (input.value || input.textContent) : "http://192.168.59.239:5502";
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(url);
                 } else if (input) {
@@ -1722,8 +1881,11 @@
         }
 
         updateCloudUI();
-        // Check server & phone status periodically
-        setInterval(updateCloudUI, 3000);
+        // Check server & phone status periodically without stacking duplicate timers
+        if (cloudUiIntervalId) {
+            clearInterval(cloudUiIntervalId);
+        }
+        cloudUiIntervalId = setInterval(updateCloudUI, 3000);
 
         // 1. Test Cloud Connection
         if (testCloudBtn) {

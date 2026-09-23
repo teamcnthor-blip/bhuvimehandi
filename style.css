@@ -1367,6 +1367,25 @@ header.scrolled .logo-img {
     transform: translateX(4px);
 }
 
+.service-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.card-action.view-style-btn {
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.service-card:hover .card-action.view-style-btn {
+    color: var(--gold);
+}
+
 /* ================= PORTFOLIO / GALLERY ================= */
 
 .portfolio {

@@ -53,8 +53,8 @@
             list.push(window.location.origin);
         }
 
-        // 3. If opened directly on port 3000 (local Node server)
-        if (window.location.port === "3000") {
+        // 3. If opened directly on port 5502 (local Node server)
+        if (window.location.port === "5502") {
             list.push("");
             list.push(window.location.origin);
         }
@@ -62,11 +62,11 @@
         // 4. Local development / LAN fallbacks (Only if NOT on HTTPS, preventing browser Mixed Content blocking)
         if (!isHttps) {
             if (window.location.hostname && window.location.hostname !== "") {
-                list.push(`http://${window.location.hostname}:3000`);
+                list.push(`http://${window.location.hostname}:5502`);
             }
-            list.push("http://localhost:3000");
-            list.push("http://127.0.0.1:3000");
-            list.push(`http://${KNOWN_LAN_IP}:3000`);
+            list.push("http://localhost:5502");
+            list.push("http://127.0.0.1:5502");
+            list.push(`http://${KNOWN_LAN_IP}:5502`);
         }
 
         // 5. Same-origin fallback
@@ -105,7 +105,7 @@
         }
 
         // Safe fallback default
-        cachedServerUrl = (window.location.port === "3000") ? "" : "http://localhost:3000";
+        cachedServerUrl = (window.location.port === "5502") ? "" : "http://localhost:5502";
         serverBaseUrl = cachedServerUrl;
         return cachedServerUrl;
     }
@@ -598,7 +598,8 @@
                             .map(r => String(r.id))
                             .filter(id => !activeIds.includes(id));
                         if (toDelete.length > 0) {
-                            await supabaseClient.from("gallery").delete().in("id", toDelete);
+                            const { error: deleteError } = await supabaseClient.from("gallery").delete().in("id", toDelete);
+                            if (deleteError) throw deleteError;
                         }
                     }
                 } else {
@@ -606,11 +607,14 @@
                     const { data: existingRows } = await supabaseClient.from("gallery").select("id");
                     if (Array.isArray(existingRows) && existingRows.length > 0) {
                         const toDelete = existingRows.map(r => String(r.id));
-                        await supabaseClient.from("gallery").delete().in("id", toDelete);
+                        const { error: deleteError } = await supabaseClient.from("gallery").delete().in("id", toDelete);
+                        if (deleteError) throw deleteError;
                     }
                 }
             } catch (ge) {
                 console.warn("Notice syncing gallery table:", ge.message);
+                window._lastSupabaseError = ge.message;
+                success = false;
             }
         }
 
@@ -671,18 +675,22 @@
                             .map(r => String(r.id))
                             .filter(id => !activeIds.includes(id));
                         if (toDelete.length > 0) {
-                            await supabaseClient.from("reviews").delete().in("id", toDelete);
+                            const { error: deleteError } = await supabaseClient.from("reviews").delete().in("id", toDelete);
+                            if (deleteError) throw deleteError;
                         }
                     }
                 } else {
                     const { data: existingReviews } = await supabaseClient.from("reviews").select("id");
                     if (Array.isArray(existingReviews) && existingReviews.length > 0) {
                         const toDelete = existingReviews.map(r => String(r.id));
-                        await supabaseClient.from("reviews").delete().in("id", toDelete);
+                        const { error: deleteError } = await supabaseClient.from("reviews").delete().in("id", toDelete);
+                        if (deleteError) throw deleteError;
                     }
                 }
             } catch (re) {
                 console.warn("Notice syncing reviews table:", re.message);
+                window._lastSupabaseError = re.message;
+                success = false;
             }
         }
 
@@ -743,7 +751,29 @@
             }
         }
 
-        // 3. Fallback: save to local IndexedDB + localStorage so it shows immediately
+        // 3. Fallback: persist the review in the local Node server catalog
+        try {
+            const serverData = await serverFetchData();
+            if (serverData && typeof serverData === "object") {
+                if (!Array.isArray(serverData.reviews)) serverData.reviews = [];
+                serverData.reviews = serverData.reviews.filter(r => String(r.id) !== String(row.id));
+                serverData.reviews.unshift({
+                    id: row.id,
+                    name: row.name,
+                    role: row.role,
+                    stars: row.stars,
+                    text: row.review_text
+                });
+                if (await serverSaveData(serverData)) {
+                    console.log("💾 BhuviDB: Review saved to server data_store.json:", row.id);
+                    return { success: true, server: true };
+                }
+            }
+        } catch (e) {
+            console.warn("BhuviDB: Server review save error:", e);
+        }
+
+        // 4. Fallback: save to local IndexedDB + localStorage so it shows immediately
         try {
             const cached = await idbGet(LOCAL_DATA_KEY) || {};
             if (!Array.isArray(cached.reviews)) cached.reviews = [];
@@ -1044,7 +1074,7 @@
         // 2. Check Server API (Authoritative for all connected devices on network/VPS)
         try {
             const sData = await serverFetchData();
-            if (sData && typeof sData === "object" && sData.gallery && sData.gallery.length > 0) {
+            if (sData && typeof sData === "object" && Array.isArray(sData.gallery)) {
                 content = sData;
                 try {
                     localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
@@ -1061,7 +1091,7 @@
                 const docSnap = await docRef.get();
                 if (docSnap.exists) {
                     const cloudData = docSnap.data();
-                    if (cloudData && typeof cloudData === "object" && cloudData.gallery && cloudData.gallery.length > 0) {
+                    if (cloudData && typeof cloudData === "object" && Array.isArray(cloudData.gallery)) {
                         content = cloudData;
                         try {
                             localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(content));
@@ -1078,7 +1108,7 @@
 
         // 4. Check Local IndexedDB (High-capacity disk storage)
         const idbData = await idbGet(LOCAL_DATA_KEY);
-        if (idbData && typeof idbData === "object" && idbData.gallery && idbData.gallery.length > 0) {
+        if (idbData && typeof idbData === "object" && Array.isArray(idbData.gallery)) {
             serverSaveData(idbData);
             return idbData;
         }
@@ -1088,7 +1118,7 @@
             const raw = localStorage.getItem(LOCAL_DATA_KEY);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (parsed && typeof parsed === "object" && parsed.gallery && parsed.gallery.length > 0) {
+                if (parsed && typeof parsed === "object" && Array.isArray(parsed.gallery)) {
                     await idbSet(LOCAL_DATA_KEY, parsed);
                     serverSaveData(parsed);
                     return parsed;

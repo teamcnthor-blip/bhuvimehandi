@@ -308,8 +308,9 @@ VALUES
 ('gal-4', 'Delicate Ring Ceremony Mehndi', 'engagement', 'Engagement', 'Delicate Mandala', 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=700&q=80', 'Elegant engagement ring ceremony mehndi', false, 4),
 ('gal-5', 'Festive Teej & Karwa Chauth Henna', 'festival', 'Festivals', 'Festive Grace', 'https://images.unsplash.com/photo-1609220136736-443140cffec6?auto=format&fit=crop&w=700&q=80', 'Festive Indian celebration mehndi', false, 5),
 ('gal-6', 'Intricate Bridal Palms & Cuffs', 'bridal', 'Bridal Collection', 'Palms & Cuffs', 'https://images.unsplash.com/photo-1532712938310-34cb3982ef74?auto=format&fit=crop&w=700&q=80', 'Intricate bridal palm and wrist mehndi', false, 6),
-('gal-7', 'Contemporary Negative-Space Arabic', 'arabic', 'Arabic Designer', 'Negative Space', 'https://images.unsplash.com/photo-1544078751-58fee2d8a03b?auto=format&fit=crop&w=700&q=80', 'Contemporary designer Arabic mehndi', false, 7),
-('gal-8', 'Traditional Jharokha & Peacock Art', 'rajasthani', 'Rajasthani Heritage', 'Jharokha & Peacock', 'https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=700&q=80', 'Traditional Rajasthani peacock henna art', false, 8)
+('gal-7', 'Contemporary Negative-Space Arabic', 'arabic', 'Arabic', 'Negative Space', 'https://images.unsplash.com/photo-1544078751-58fee2d8a03b?auto=format&fit=crop&w=700&q=80', 'Contemporary designer Arabic mehndi', false, 7),
+('gal-8', 'Traditional Jharokha & Peacock Art', 'rajasthani', 'Rajasthani/Bharwa', 'Jharokha & Peacock', 'https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=700&q=80', 'Traditional Rajasthani peacock henna art', false, 8),
+('gal-9', 'Luxury Royal Designer Mandala & Grid', 'designer', 'Designer', 'Mandala & Grid Fusion', 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=700&q=80', 'Luxury designer mehndi art with intricate cuffs', false, 9)
 ON CONFLICT (id) DO UPDATE
 SET title = EXCLUDED.title, category = EXCLUDED.category, image_url = EXCLUDED.image_url;
 

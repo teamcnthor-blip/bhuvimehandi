@@ -4,6 +4,8 @@
    ========================================================= */
 
 function initBhuviStudio() {
+    if (window.__bhuviStudioInitialized) return;
+    window.__bhuviStudioInitialized = true;
 
     /* ================= DYNAMIC DATA HYDRATION (FROM ADMIN PANEL) ================= */
     function escapeHtml(str) {
@@ -14,6 +16,18 @@ function initBhuviStudio() {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    // Helper to normalize category keys & handle aliases across website
+    function normalizeCatKey(cat) {
+        const c = (cat || "bridal").toLowerCase().trim();
+        if (c === "bride & groom" || c === "bride_groom" || c === "bridal collection" || c === "bridal") return "bridal";
+        if (c === "rajasthani/bharwa" || c === "rajasthani_bharwa" || c === "rajasthani heritage" || c === "rajasthani" || c === "bharwa rajasthani") return "rajasthani";
+        if (c === "arabic" || c === "arabic style" || c === "arabic designer" || c === "arabic mehndi") return "arabic";
+        if (c === "designer" || c === "designer mehndi" || c === "royal designer" || c === "contemporary designer") return "designer";
+        if (c === "engagement" || c === "engagement & roka" || c === "roka") return "engagement";
+        if (c === "festival" || c === "festivals" || c === "festive") return "festival";
+        return c;
     }
 
     function renderDynamicGallery(galleryList) {
@@ -32,40 +46,59 @@ function initBhuviStudio() {
             return;
         }
 
-        // Calculate counts
-        const categoryCounts = { all: galleryList.length };
-        galleryList.forEach(item => {
-            const cat = (item.category || "bridal").toLowerCase();
-            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-        });
-
-        // Known category labels
+        // Known category display labels
         const categoryLabels = {
             all: "All Designs",
-            bridal: "Bridal",
+            bridal: "Bride & Groom",
             arabic: "Arabic",
-            rajasthani: "Rajasthani",
+            rajasthani: "Rajasthani/Bharwa",
+            designer: "Designer",
             engagement: "Engagement",
             festival: "Festival",
             minimalist: "Minimalist",
             contemporary: "Contemporary"
         };
 
+        // Calculate counts using normalized keys to prevent duplicate tabs
+        const categoryCounts = { all: galleryList.length };
+        galleryList.forEach(item => {
+            const cat = normalizeCatKey(item.category);
+            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        });
+
+        // Preferred tab ordering - always include all primary studio categories so Arabic and Designer never disappear
+        const coreCats = ["bridal", "arabic", "rajasthani", "designer", "engagement", "festival"];
+        const otherCats = Object.keys(categoryCounts).filter(c => c !== "all" && !coreCats.includes(c));
+        const allTabs = [...coreCats, ...otherCats];
+
         // Render filter buttons
-        let filtersHtml = `<button class="filter-btn active" onclick="filterGallery('all', this)">All Designs (${categoryCounts.all})</button>`;
-        Object.keys(categoryCounts).forEach(cat => {
-            if (cat === "all") return;
+        let filtersHtml = `<button class="filter-btn active" onclick="filterGallery('all', this)">All Designs (${categoryCounts.all || 0})</button>`;
+        allTabs.forEach(cat => {
+            const count = categoryCounts[cat] || 0;
             const label = categoryLabels[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1));
-            filtersHtml += `<button class="filter-btn" onclick="filterGallery('${cat}', this)">${label} (${categoryCounts[cat]})</button>`;
+            filtersHtml += `<button class="filter-btn" onclick="filterGallery('${cat}', this)">${label} (${count})</button>`;
         });
         filtersContainer.innerHTML = filtersHtml;
+
+        // Helper to format badge label
+        function getCategoryBadge(item) {
+            const norm = normalizeCatKey(item.category);
+            if (categoryLabels[norm]) return categoryLabels[norm];
+            const rawLabel = (item.categoryLabel || item.category_label || "").trim();
+            const rawLower = rawLabel.toLowerCase();
+            if (rawLower === "bridal collection" || rawLower === "bridal") return "Bride & Groom";
+            if (rawLower === "rajasthani heritage" || rawLower === "rajasthani") return "Rajasthani/Bharwa";
+            if (rawLower === "arabic style" || rawLower === "arabic designer") return "Arabic";
+            if (rawLabel) return rawLabel;
+            return item.category ? item.category.toUpperCase() : "MEHNDI";
+        }
 
         // Render gallery items - exactly matching style.css structure and lightbox handler
         galleryGrid.innerHTML = galleryList.map(item => {
             const largeClass = (item.isLarge || item.is_large) ? " large" : "";
-            const catClass = (item.category || "bridal").toLowerCase();
-            const catBadge = item.categoryLabel || item.category_label || (item.category ? item.category.toUpperCase() : "MEHNDI");
-            const sub = item.subtitle || item.categoryLabel || item.title || "Royal Henna";
+            const catClass = normalizeCatKey(item.category);
+            const catBadge = getCategoryBadge(item);
+            const sub = item.subtitle || catBadge || item.title || "Royal Henna";
             const title = item.title || "Mehndi Design";
             const imgSrc = item.src || item.image_url || item.image || "";
             const altText = item.alt || item.alt_text || title;
@@ -281,6 +314,8 @@ function initBhuviStudio() {
         return false;
     }
 
+    let lastAppliedDataSignature = "";
+
     const defaultHeroBanners = [
         {
             id: "banner-1",
@@ -301,6 +336,20 @@ function initBhuviStudio() {
 
     function applyDataToWebsite(data) {
         if (!data || typeof data !== "object") return;
+
+        const currentSignature = JSON.stringify({
+            heroBanners: Array.isArray(data.heroBanners) ? data.heroBanners : [],
+            gallery: Array.isArray(data.gallery) ? data.gallery : [],
+            reviews: Array.isArray(data.reviews) ? data.reviews : [],
+            hero: data.hero || {},
+            about: data.about || {},
+            settings: data.settings || {}
+        });
+
+        if (currentSignature === lastAppliedDataSignature) {
+            return;
+        }
+        lastAppliedDataSignature = currentSignature;
 
         // 1. Hero Brand Carousel
         let bannersToUse = [];
@@ -405,51 +454,72 @@ function initBhuviStudio() {
         }
     }
 
+    let loadCustomizedDataInFlight = false;
+
     async function loadCustomizedData() {
-        let data = null;
+        if (loadCustomizedDataInFlight) return;
+        loadCustomizedDataInFlight = true;
 
-        // 1. Read from localStorage immediately (instant synchronous render)
         try {
-            const raw = localStorage.getItem(DATA_KEY);
-            if (raw) data = JSON.parse(raw);
-        } catch (e) {}
+            let data = null;
 
-        if (data && typeof data === "object") {
-            applyDataToWebsite(data);
-        } else {
-            renderHeroCarousel(defaultHeroBanners);
-        }
-
-        // 2. Read from BhuviDB Unified Storage (Supabase PostgreSQL -> Server API -> Cloud Firestore -> IndexedDB)
-        if (window.BhuviDB && typeof window.BhuviDB.getSiteContent === "function") {
+            // 1. Read from localStorage immediately (instant synchronous render)
             try {
-                const liveData = await window.BhuviDB.getSiteContent();
-                if (liveData && typeof liveData === "object") {
-                    console.log("⚡ Bhuvi Studio: Hydrating live data from Supabase / Remote Storage.");
-                    applyDataToWebsite(liveData);
-                }
-            } catch (err) {
-                console.warn("BhuviDB live data notice:", err);
+                const raw = localStorage.getItem(DATA_KEY);
+                if (raw) data = JSON.parse(raw);
+            } catch (e) {}
+
+            if (data && typeof data === "object") {
+                applyDataToWebsite(data);
+            } else {
+                renderHeroCarousel(defaultHeroBanners);
             }
-        } else {
-            // Fallback: Read from IndexedDB directly
-            idbGet(DATA_KEY).then((idbData) => {
-                if (idbData && typeof idbData === "object") {
-                    applyDataToWebsite(idbData);
+
+            // 2. Read from BhuviDB Unified Storage (Supabase PostgreSQL -> Server API -> Cloud Firestore -> IndexedDB)
+            if (window.BhuviDB && typeof window.BhuviDB.getSiteContent === "function") {
+                try {
+                    const liveData = await window.BhuviDB.getSiteContent();
+                    if (liveData && typeof liveData === "object") {
+                        console.log("⚡ Bhuvi Studio: Hydrating live data from Supabase / Remote Storage.");
+                        applyDataToWebsite(liveData);
+                    }
+                } catch (err) {
+                    console.warn("BhuviDB live data notice:", err);
                 }
-            });
+            } else {
+                // Fallback: Read from IndexedDB directly
+                idbGet(DATA_KEY).then((idbData) => {
+                    if (idbData && typeof idbData === "object") {
+                        applyDataToWebsite(idbData);
+                    }
+                });
+            }
+        } finally {
+            loadCustomizedDataInFlight = false;
         }
+    }
+
+    let lastRefreshRequestTs = 0;
+    const REFRESH_THROTTLE_MS = 2000;
+
+    function requestDataRefresh(force = false) {
+        const now = Date.now();
+        if (!force && now - lastRefreshRequestTs < REFRESH_THROTTLE_MS) {
+            return;
+        }
+        lastRefreshRequestTs = now;
+        loadCustomizedData();
     }
 
     // Real-time synchronization across open tabs, window focus, and Cloud Firestore
     window.addEventListener("storage", (e) => {
         if (e.key === DATA_KEY || e.key === "bhuvi_last_sync") {
-            loadCustomizedData();
+            requestDataRefresh();
         }
     });
 
     window.addEventListener("focus", () => {
-        loadCustomizedData();
+        requestDataRefresh();
     });
 
     try {
@@ -457,7 +527,7 @@ function initBhuviStudio() {
             const channel = new BroadcastChannel("bhuvi_studio_channel");
             channel.onmessage = (e) => {
                 if (e.data && e.data.type === "DATA_UPDATED") {
-                    loadCustomizedData();
+                    requestDataRefresh();
                 }
             };
         }
@@ -473,12 +543,13 @@ function initBhuviStudio() {
                     localStorage.setItem("bhuvi_last_sync", String(Date.now()));
                 } catch (e) {}
                 applyDataToWebsite(freshContent);
+                requestDataRefresh(true);
             }
         });
     }
 
     // Initial load right after listeners are attached
-    loadCustomizedData();
+    requestDataRefresh(true);
 
 function renderDynamicReviews(reviewsList) {
     const grid = document.getElementById("reviewsGrid");
@@ -623,16 +694,13 @@ window.submitClientReview = async function (event) {
         nameInput.value = "";
         if (roleInput) roleInput.value = "";
         textInput.value = "";
-        alert("✦ Thank you so much for sharing your review! It has been published on the website.");
+        window.location.assign("index.html");
     } catch (err) {
         console.error("Could not save review:", err);
         alert("Thank you! Your review has been received.");
         window.closeClientReviewModal();
     }
 };
-
-// Load customized data from Admin Panel immediately
-loadCustomizedData();
 
 
     /* ================= DYNAMIC YEAR ================= */
@@ -734,16 +802,56 @@ loadCustomizedData();
         const items = document.querySelectorAll(".gallery-item");
         const buttons = document.querySelectorAll(".filter-btn");
 
+        const target = (category || "all").toLowerCase().trim();
+        const normTarget = normalizeCatKey(target);
+
+        // Highlight matching filter button
         buttons.forEach(btn => btn.classList.remove("active"));
-        if (button) button.classList.add("active");
+        if (button) {
+            button.classList.add("active");
+        } else {
+            buttons.forEach(btn => {
+                const onclickAttr = (btn.getAttribute("onclick") || "").toLowerCase();
+                const btnText = btn.textContent.toLowerCase();
+                if (
+                    onclickAttr.includes(`'${normTarget}'`) ||
+                    onclickAttr.includes(`"${normTarget}"`) ||
+                    (normTarget === "arabic" && btnText.includes("arabic")) ||
+                    (normTarget === "designer" && btnText.includes("designer")) ||
+                    (normTarget === "bridal" && (btnText.includes("bridal") || btnText.includes("bride"))) ||
+                    (normTarget === "rajasthani" && btnText.includes("rajasthani")) ||
+                    (normTarget === "engagement" && btnText.includes("engagement")) ||
+                    (normTarget === "festival" && btnText.includes("festival")) ||
+                    (normTarget === "all" && btnText.includes("all"))
+                ) {
+                    btn.classList.add("active");
+                }
+            });
+        }
 
         items.forEach(item => {
-            if (category === "all" || item.dataset.category === category) {
+            const rawCat = (item.dataset.category || "").toLowerCase().trim();
+            const normItemCat = normalizeCatKey(rawCat);
+
+            if (target === "all" || normTarget === "all") {
+                item.style.display = "block";
+            } else if (normItemCat === normTarget || rawCat === target) {
                 item.style.display = "block";
             } else {
                 item.style.display = "none";
             }
         });
+    };
+
+    /* Helper: Jump smoothly to Gallery and activate category filter (e.g. Arabic, Designer) */
+    window.viewGalleryCategory = function (category) {
+        const portfolio = document.getElementById("portfolio");
+        if (portfolio) {
+            portfolio.scrollIntoView({ behavior: "smooth" });
+        }
+        setTimeout(() => {
+            window.filterGallery(category);
+        }, 150);
     };
 
 

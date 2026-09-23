@@ -12,7 +12,7 @@ const path = require("path");
 const url = require("url");
 const os = require("os");
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5502;
 const DATA_FILE = path.join(__dirname, "data_store.json");
 const INQUIRIES_FILE = path.join(__dirname, "inquiries_store.json");
 const CONFIG_FILE = path.join(__dirname, "config_store.json");
